@@ -30,6 +30,7 @@ Output schema (primary key = [Area, ASFIS Scientific Name, Location]):
 
 # Silence the Pandas future warnings on output
 import warnings
+
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import os
@@ -39,6 +40,7 @@ import json
 
 # Change directory for import
 import sys
+
 sys.path.append(os.path.dirname(os.getcwd()))
 
 from utils.data_cleanup_and_validation import *
@@ -55,7 +57,7 @@ def main():
     mappings = get_asfis_mappings(
         input_dir, "ASFIS_sp_2024.csv", "ASFIS_changes_2024.xlsx"
     )
-    
+
     scientific_update = mappings["ASFIS Scientific Name Update"]
     scientific_to_name = mappings["ASFIS Scientific Name to ASFIS Name"]
     scientific_to_isscaap = mappings["ASFIS Scientific Name to ISSCAAP Code"]
@@ -647,7 +649,7 @@ def main():
     )
     angolan_stocks = angolan_stocks[angolan_stocks_mask]
     overview["47"] = pd.concat([overview["47"], angolan_stocks]).reset_index(drop=True)
-    
+
     # Fill the NaN Location values with the name of the Area
     for sheet, df in overview.items():
         overview[sheet] = fix_nan_location(df)

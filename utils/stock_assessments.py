@@ -40,7 +40,7 @@ def get_asfis_mappings(
             "ASFIS Scientific Name to ASFIS Name": Mapping from scientific to common names.
             "ASFIS Scientific Name to ISSCAAP Code": Mapping from scientific names to ISSCAAP codes.
             "ASFIS Scientific Names": Unique scientific names from ASFIS data.
-            
+
             And the following mappings if name_changes_file is specified:
                 "ASFIS Scientific Name Update": Dictionary of scientific name updates.
                 "ASFIS Name Update": Dictionary of common name updates.
@@ -55,13 +55,13 @@ def get_asfis_mappings(
     )
     scientific_names = asfis["Scientific_Name"].unique()
 
-    mappings =  {
+    mappings = {
         "ASFIS": asfis,
         "ASFIS Scientific Name to ASFIS Name": scientific_to_name,
         "ASFIS Scientific Name to ISSCAAP Code": scientific_to_isscaap,
         "ASFIS Scientific Names": scientific_names,
     }
-    
+
     if name_changes_file:
         name_changes = pd.read_excel(
             os.path.join(input_dir, name_changes_file),
@@ -74,13 +74,13 @@ def get_asfis_mappings(
         merged_df = pd.merge(
             old_df, current_df, on="Alpha3_Code", suffixes=("_old", "_current")
         )
-        
+
         scientific_update = dict(
             zip(merged_df["Scientific_Name_old"], merged_df["Scientific_Name_current"])
         )
-        
+
         mappings["ASFIS Scientific Name Update"] = scientific_update
-        
+
     return mappings
 
 
@@ -616,12 +616,13 @@ def filter_dfs(overview, col_values):
 
     return df_dict
 
+
 def fix_nan_location(df):
     data = df.copy()
-        
+
     nan_mask = data["Location"].isna()
     area = df["Area"].values[0]
-    
+
     def make_location_from_area(area):
         if isinstance(area, (int, np.int64)):
             area_loc = f"Area {area}"
@@ -629,11 +630,13 @@ def fix_nan_location(df):
             area_loc = f"Areas {area}"
         else:
             area_loc = area
-            
+
         return area_loc
-    
-    data.loc[nan_mask, "Location"] = data[nan_mask]["Area"].apply(make_location_from_area)
-        
+
+    data.loc[nan_mask, "Location"] = data[nan_mask]["Area"].apply(
+        make_location_from_area
+    )
+
     return data
 
 

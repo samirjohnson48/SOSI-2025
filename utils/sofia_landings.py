@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import os
 
+
 def convert_status_to_list(status):
     if not isinstance(status, str) and np.isnan(status):
         return [status]
@@ -27,6 +28,7 @@ def convert_status_to_list(status):
 
     return [status]
 
+
 def get_proxy_name(sn, scientific_names):
     if pd.isna(sn):
         return sn
@@ -42,12 +44,12 @@ def get_proxy_name(sn, scientific_names):
 
     return np.nan
 
+
 def normalize_landings(sofia, years, key=["Area", "ASFIS Scientific Name"]):
     sofia["n"] = sofia.groupby(key)[key[0]].transform("count")
 
     sofia[years] = sofia[years].div(sofia["n"], axis=0)
-    
+
     sofia = sofia.drop(columns="n")
-    
+
     return sofia
-    
