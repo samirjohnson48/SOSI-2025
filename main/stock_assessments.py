@@ -43,7 +43,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.getcwd()))
 
-from utils.data_cleanup_and_validation import *
+from utils.stock_assessments import *
 
 
 def main():
