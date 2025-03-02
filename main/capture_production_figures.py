@@ -24,8 +24,7 @@ def main():
     output_dir = os.path.join(parent_dir, "output", "figures")
     table_dir = os.path.join(parent_dir, "output", "aggregate_tables")
     
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
         
     # Set font to Helvetica for figures
     plt.rcParams["font.family"] = "Helvetica"
