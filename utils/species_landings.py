@@ -14,13 +14,13 @@ def format_fishstat(fishstat, code_to_scientific=[], year_start=1950, year_end=2
 
     rename_dict = {f"[{year}]": year for year in range(year_start, year_end + 1)}
     rename_dict["Country (ISO3 code)"] = "ISO3"
-    rename_dict["ASFIS species (3-alpha code)"] = "3-alpha code"
+    rename_dict["ASFIS species (3-alpha code)"] = "Alpha3_Code"
     rename_dict["FAO major fishing area (Code)"] = "Area"
     rename_dict["Unit (Name)"] = "Unit"
     fishstat = fishstat.rename(columns=rename_dict)
 
     if code_to_scientific:
-        fishstat["ASFIS Scientific Name"] = fishstat["3-alpha code"].map(
+        fishstat["ASFIS Scientific Name"] = fishstat["Alpha3_Code"].map(
             code_to_scientific
         )
 

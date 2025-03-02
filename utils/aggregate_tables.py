@@ -513,7 +513,7 @@ def compute_appendix_landings(
             aqua = aquaculture[aquaculture["Area"].isin(area_list)]
 
         cap = create_decade_cols(cap)
-        cap = cap.drop(columns=["3-alpha code"])
+        cap = cap.drop(columns=["Alpha3_Code"])
 
         total_cap = cap[get_numeric_cols(cap.columns)].sum() / 1e3
 
