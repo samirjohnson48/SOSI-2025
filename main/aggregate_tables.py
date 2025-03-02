@@ -24,7 +24,7 @@ def main():
     clean_data_dir = os.path.join(parent_dir, os.path.join("output", "clean_data"))
     output_dir = os.path.join(parent_dir, os.path.join("output", "aggregate_tables"))
     
-    os.make_dirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
     # Retrieve ASFIS mappings
     asfis_mapping = get_asfis_mappings(input_dir, "ASFIS_sp_2024.csv")
