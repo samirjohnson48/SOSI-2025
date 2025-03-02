@@ -67,6 +67,7 @@ def compute_missing_landings(
         proxy_species = (
             df[no_landings_mask]["ISSCAAP Code"].map(isscaap_to_nei).unique()
         )
+        proxy_species = proxy_species[pd.notna(proxy_species)]
 
         # Don't include seals since they are taken out in calculations
         seals_mask = df["ISSCAAP Code"] == 63
