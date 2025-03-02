@@ -31,13 +31,14 @@ def use_proxy_landings(
     stock_landings,
     proxy_landings,
     primary_key=["Area", "ASFIS Scientific Name", "Location"],
+    landings_key="Stock Landings 2021"
 ):
     merge = pd.merge(stock_landings, proxy_landings, on=primary_key, how="left")
 
     no_landings_mask = (
-        merge["Stock Landings 2021"].isna() | merge["Stock Landings 2021"] == 0
+        merge[landings_key].isna() | merge[landings_key] == 0
     )
-    merge.loc[no_landings_mask, "Stock Landings 2021"] = [
+    merge.loc[no_landings_mask, landings_key] = [
         float(val) for val in merge.loc[no_landings_mask, "Proxy Landings"].values
     ]
     merge.loc[~no_landings_mask, "Proxy Species"] = np.nan
@@ -93,6 +94,8 @@ def compute_missing_landings(
             no_l_counts.get("M", 0),
             no_l_counts.get("O", 0),
         )
+        
+        print(area, no_l)
 
         # Assign stock landings for stocks with no landings
         # (or reassign landings for Marine Fishes NEI so not to double count)
