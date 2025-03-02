@@ -51,6 +51,8 @@ def main():
     parent_dir = os.path.dirname(os.getcwd())
     input_dir = os.path.join(parent_dir, "input")
     output_dir = os.path.join(parent_dir, os.path.join("output", "clean_data"))
+    
+    os.makedirs(output_dir, exist_ok=True)
 
     # Read in the ASFIS mappings (between common name, scientific name, and ISSCAAP group)
     print("Creating mappings...")
