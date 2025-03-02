@@ -95,8 +95,6 @@ def compute_missing_landings(
             no_l_counts.get("O", 0),
         )
         
-        print(area, no_l)
-
         # Assign stock landings for stocks with no landings
         # (or reassign landings for Marine Fishes NEI so not to double count)
         u_mask, m_mask, o_mask = (
