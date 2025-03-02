@@ -165,6 +165,9 @@ def main():
     sos.to_excel(sos_fp, index=False)
 
     # Save same aggregations for individual areas
+    area_summary_dir = os.path.join(output_dir, "Area Statistics")
+    os.makedirs(area_summary_dir, exist_ok=True)
+    
     for area in stock_assessments["Area"].unique():
         sbna = sbn_area[sbn_area["Area"] == area]
         sbnt = compute_status_by_number(
@@ -175,9 +178,8 @@ def main():
         )
         cbn = sbn_comp[sbn_comp[("", "Area")] == area]
 
-        area_summary_fp = os.path.join(
-            output_dir, os.path.join("Area Statistics", f"area_{area}_summary.xlsx")
-        )
+        area_summary_fp = os.path.join(area_summary_dir, f"area_{area}_summary.xlsx")
+        
         with pd.ExcelWriter(area_summary_fp) as writer:
             sbna.to_excel(writer, sheet_name="Status by Number")
             sbnt.to_excel(writer, sheet_name="Status by Tier")
