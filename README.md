@@ -20,11 +20,12 @@ python3 main.py
 
 ## Organization
 
-The repository is organized into three folders: 
+The repository is organized into four folders: 
 
 * [input](/input/): All inputs files for analysis
 * [main](/scripts/): All scripts used for producing output files
 * [utils](/utils/): All scripts containing utility functions used by the main processing scripts in the [/scripts/](/scripts/) directory.
+* [output](/output/): All output files from analysis
 
 ### input
 
@@ -47,7 +48,7 @@ The repository is organized into three folders:
 
 ### scripts
 
-These are the scripts used to produce the analysis outputs. The outputs are produced in the [/output/] folder which is created upon running scripts in [/scripts/](/scripts/). They are separated into three subfolders: [/clean_data/], [/aggregate_tables/], and [/figures/]. 
+These are the scripts used to produce the analysis [outputs](/output/). 
 
 To run any of these scripts individually, change directory to parent directory [SOSI-2025] as run the following (e.g. for [stock_assessments.py](/scripts/stock_assessments.py)):
 
@@ -58,15 +59,23 @@ python3 -m scripts.stock_assessments.py
 The scripts are described below, in the order of the full data pipeline:
 
 * [stock_assessments.py](/scripts/stock_assessments.py): Produces list of all stock assessments, with schema Area, ASFIS Scientific Name, Location, Tier, Status, and Uncertainty. Output includes two files: 
-    * [stock_assessments.xlsx]: List of all assessed stocks.
-    * [stock_assessments_w_unassessed.xlsx]: List of all assessed and unassessed stocks.
-* [species_landings.py](/scripts/species_landings.py): Produces list of stocks with corresponding species landings from 1950-2021 as reported in Fishstat. Output file: [species_landings.xlsx] 
-* [sofia_landings.py](/scripts/sofia_landings.py): Produces list of stocks from SOFIA 2024 data with corresponding 2021 stock landings as reported in Fishstat. Output file: [sofia_landings.xlsx]
-* [stock_weights.py](/scripts/stock_weights.py): Produces list of stocks with corresponding normalized stock weights used to calculate 2021 stock landings. Output file: [stock_weights.xlsx]
-* [stock_landings.py](/scripts/stock_landings.py): Produces list of stocks with computed 2021 stock landings. If proxy species is used for stock landings, it is listed under column 'Proxy Species'. Output file: [stock_landings.xlsx]
-* [aggregate_tables.py](/scripts/aggregate_tables.py): Produces all aggregate tables used in report, using the output files in [/output/clean_data/] as inputs. Output is stored in folder [/output/aggregate_tables/].
-* [capture_production_figures.py](/scripts/capture_production_figures.py): Produces all capture production analysis figures for the individual areas used in the report. Output figures are stored in [/output/figures/]. Data for the figures are stored in [/output/aggregate_tables/].
+    * [stock_assessments.xlsx](/output/clean_data/stock_assessments.xlsx): List of all assessed stocks.
+    * [stock_assessments_w_unassessed.xlsx](/output/clean_data/stock_assessments_w_unassessed.xlsx): List of all assessed and unassessed stocks.
+* [species_landings.py](/scripts/species_landings.py): Produces list of stocks with corresponding species landings from 1950-2021 as reported in Fishstat. Output file: [species_landings.xlsx](/output/clean_data/species_landings.xlsx)
+* [sofia_landings.py](/scripts/sofia_landings.py): Produces list of stocks from SOFIA 2024 data with corresponding 2021 stock landings as reported in Fishstat. Output file: [sofia_landings.xlsx](/output/clean_data/sofia_landings.xlsx)
+* [stock_weights.py](/scripts/stock_weights.py): Produces list of stocks with corresponding normalized stock weights used to calculate 2021 stock landings. Output file: [stock_weights.xlsx](/output/clean_data/stock_weights.xlsx)
+* [stock_landings.py](/scripts/stock_landings.py): Produces list of stocks with computed 2021 stock landings. If proxy species is used for stock landings, it is listed under column 'Proxy Species'. Output file: [stock_landings.xlsx](/output/clean_data/stock_landings.xlsx)
+* [aggregate_tables.py](/scripts/aggregate_tables.py): Produces all aggregate tables used in report, using the output files in [clean_data](/output/clean_data/) as inputs. Output is stored in folder [aggregate tables](/output/aggregate_tables/)
+* [capture_production_figures.py](/scripts/capture_production_figures.py): Produces all capture production analysis figures for the individual areas used in the report. Output figures are stored in [figures](/output/figures/). Figure data is stored in [capture_production_figures_data.xlsx](/output/aggregate_tables/capture_production_figures_data.xlsx) and [top10species_by_area.xlsx](/output/aggregate_tables/top10species_by_area.xlsx).
 
 ### utils
 
 This folder contains all scripts with utility functions used by the main processing scripts in the [/scripts/](/scripts/) directory. Each file in this folder contains the same name as the file in [/scripts/](/scripts/) directory for which it is used.
+
+### output
+
+The outputs are produced in the [/output/] folder which is created upon running scripts in [/scripts/](/scripts/) or the entire pipeline via [main.py](/main.py). They are separated into three subfolders: 
+
+* [/clean_data/](/output/clean_data/): All cleaned and validated data produced from input files and to be used to create aggregate tables.
+* [/aggregate_tables/](/output/clean_data/): All tables aggregated to be used in report created from the cleaned data.
+* [/figures/](/output/figures/): All capture production figures based on Fishstat data 
