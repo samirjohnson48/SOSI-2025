@@ -6,10 +6,8 @@ import pandas as pd
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-from scipy.signal import find_peaks
 import inflect
-from matplotlib import rc
+# from scipy.signal import find_peaks
 
 def compute_top_species_by_area(fishstat, file_path, year=2021, num_species=10):
     # Identify top 10 species for each area by production
