@@ -74,7 +74,7 @@ This folder contains all scripts with utility functions used by the main process
 
 ### output
 
-The outputs are produced in the [/output/] folder which is created upon running scripts in [/scripts/](/scripts/) or the entire pipeline via [main.py](/main.py). They are separated into three subfolders: 
+The outputs are produced in the [output](/output/) folder which is created upon running scripts in [/scripts/](/scripts/) or the entire pipeline via [main.py](/main.py). They are separated into three subfolders: 
 
 * [/clean_data/](/output/clean_data/): All cleaned and validated data produced from input files and to be used to create aggregate tables.
 * [/aggregate_tables/](/output/clean_data/): All tables aggregated to be used in report created from the cleaned data.
