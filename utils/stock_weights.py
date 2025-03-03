@@ -195,18 +195,23 @@ def specify_area(row, location_to_area):
 def compute_weights(group):
     # See if weight 2 should be used
     if all(
-        group["Weight 1"].apply(lambda x: isinstance(x, str) or np.isnan(x) or x == 0)
+        group["Weight 1"].apply(lambda x: isinstance(x, str) or pd.isna(x) or x == 0)
     ):
         if all(group["Weight 2"].isna()) or all(group["Weight 2"] == 0):
             return pd.Series(1 / len(group), index=group.index)
         else:
             group["Weight 2"] = group["Weight 2"].fillna(1)
             return group["Weight 2"] / group["Weight 2"].sum()
-
+        
+    # Set base value of Weight 1 to 0.001
+    # All stocks with species landings should get non-zero catch
+    zero_mask = group["Weight 1"] == 0
+    group.loc[zero_mask, "Weight 1"] = 1e-3
+        
     # Get all rows with valid entries for Weight 1
     val = group[
         group["Weight 1"].apply(
-            lambda x: isinstance(x, (int, float)) and not np.isnan(x)
+            lambda x: isinstance(x, (int, float)) and not pd.isna(x)
         )
     ]
 
@@ -214,9 +219,9 @@ def compute_weights(group):
     group["Weight 2"] = group["Weight 2"].fillna(1)
 
     for idx, row in group.iterrows():
-        if isinstance(row["Weight 1"], str) or np.isnan(row["Weight 1"]):
+        if isinstance(row["Weight 1"], str) or pd.isna(row["Weight 1"]):
             # If priority weight is missing
-            if len(val[val["Weight 2"] == row["Weight 2"]]) > 0:
+            if sum(val["Weight 2"] == row["Weight 2"]) > 0:
                 # Check if there is a stock which has priority weight with equal secondary weight
                 # Use the mean priority weight from all stocks with equal secondary weight
                 group.loc[idx, "weight"] = val[val["Weight 2"] == row["Weight 2"]][
