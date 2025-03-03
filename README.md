@@ -5,6 +5,7 @@ This repository contains the files used for the State of Stocks Index 2025.
 ## Requirements
 
 All package requirements are listed in [requirements.txt](requirements.txt) and can be installed via
+
 ```
 pip install -r requirements.txt
 ```
@@ -65,3 +66,7 @@ The scripts are described below, in the order of the full data pipeline:
 * [stock_landings.py](/scripts/stock_landings.py): Produces list of stocks with computed 2021 stock landings. If proxy species is used for stock landings, it is listed under column 'Proxy Species'. Output file: [stock_landings.xlsx]
 * [aggregate_tables.py](/scripts/aggregate_tables.py): Produces all aggregate tables used in report, using the output files in [/output/clean_data/] as inputs. Output is stored in folder [/output/aggregate_tables/].
 * [capture_production_figures.py](/scripts/capture_production_figures.py): Produces all capture production analysis figures for the individual areas used in the report. Output figures are stored in [/output/figures/]. Data for the figures are stored in [/output/aggregate_tables/].
+
+### utils
+
+This folder contains all scripts with utility functions used by the main processing scripts in the [/scripts/](/scripts/) directory. Each file in this folder contains the same name as the file in [/scripts/](/scripts/) directory for which it is used.
