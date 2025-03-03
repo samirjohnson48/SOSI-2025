@@ -162,7 +162,7 @@ def main():
     # Create summary of stocks and save file
     sos = compute_summary_of_stocks(stock_assessments_full)
     sos_fp = os.path.join(output_dir, "summary_of_stocks.xlsx")
-    sos.to_excel(sos_fp, index=False)
+    sos.to_excel(sos_fp)
 
     # Save same aggregations for individual areas
     area_summary_dir = os.path.join(output_dir, "Area Statistics")
