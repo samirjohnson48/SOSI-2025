@@ -233,13 +233,17 @@ def main():
         os.path.join(clean_data_dir, "species_landings.xlsx")
     )
 
-    # Define ISSCAAP Codes to remove from appendix
-    # (unless they appear in assessment, then they are added back in)
-    isscaap_to_remove = [46, 61, 62, 63, 64, 71, 72, 73, 74, 81, 82, 83, 91, 92, 93, 94]
-
     # Add ISSCAAP Code, ASFIS Name, Status, and Uncertainty to species landings
     primary_key = ["Area", "ASFIS Scientific Name", "Location"]
     species_landings = pd.merge(species_landings, stock_assessments, on=primary_key)
+    
+    # Take out seals since they are reported by number
+    no_seals_mask = ~(species_landings["ISSCAAP Code"] == 63)
+    species_landings = species_landings[no_seals_mask]
+    
+    # Define ISSCAAP Codes to remove from appendix
+    # (unless they appear in assessment, then they are added back in)
+    isscaap_to_remove = [46, 61, 62, 63, 64, 71, 72, 73, 74, 81, 82, 83, 91, 92, 93, 94]
 
     # Add ISSCAAP Code to capture data
     fishstat["ISSCAAP Code"] = fishstat["ASFIS Scientific Name"].map(
@@ -428,11 +432,13 @@ def main():
     sofia_landings.loc[mask_485888, "Area"] = "48,58,88"
 
     # Get assessed stocks from SOFIA data
-    sofia_assessed_mask = sofia_landings["Status"].isin(["U", "F", "O"])
-    sofia_landings_assessed = sofia_landings[sofia_assessed_mask]
-    sofia_landings_assessed["Status"] = sofia_landings_assessed["Status"].apply(
+    sofia_landings_assessed = sofia_landings.rename(columns={"Status": "Status Old"})
+    sofia_landings_assessed["Status"] = sofia_landings_assessed["Status Old"].apply(
         lambda x: {"F": "M"}.get(x, x)
     )
+    sofia_assessed_mask = sofia_landings_assessed["Status"].isin(["U", "M", "O"])
+    sofia_landings_assessed = sofia_landings_assessed[sofia_assessed_mask]
+    
     sofia_landings_assessed = sofia_landings_assessed.rename(
         columns={2021: "Stock Landings 2021"}
     )
