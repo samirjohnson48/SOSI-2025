@@ -144,7 +144,7 @@ def merge_weights(
         )
         primary_key.remove("Location")
         primary_key.append("Location Match")
-
+        
     merge = pd.merge(
         weights,
         new_weights,
@@ -154,7 +154,7 @@ def merge_weights(
         indicator=True,
     )
 
-    new_cols = [col for col in merge.columns if "_new" in col]
+    new_cols = [col for col in merge.columns if "_new" in col and col != "Location_new"]
     for new_col in new_cols:
         og_col = new_col.replace("_new", "")
         merge[og_col] = merge[new_col].fillna(merge[og_col])

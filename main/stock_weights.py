@@ -99,7 +99,7 @@ def main():
     )
     weights = merge_weights(weights, weights_india, primary_key, weight1_na=True)
     weights = merge_weights(weights, weights_31_37_81, primary_key)
-
+    
     # Assign the normalized weights based off Weight 1 and Weight 2
     # Specify the area for stocks in categorical areas e.g. 48,58,88, Tuna, etc.
     # Retrieve location_to_area map

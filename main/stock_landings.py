@@ -13,7 +13,6 @@ import sys
 sys.path.append(os.path.dirname(os.getcwd()))
 
 from utils.stock_landings import *
-from utils.stock_weights import extract_alphanumeric
 from utils.stock_assessments import get_asfis_mappings
 from utils.species_landings import format_fishstat
 
@@ -31,15 +30,10 @@ def main():
     weights = pd.read_excel(os.path.join(output_dir, "stock_weights.xlsx"))
 
     # Merge the two dataframes
-    species_landings["Location Match"] = species_landings["Location"].apply(
-        extract_alphanumeric
-    )
-    weights["Location Match"] = weights["Location"].apply(extract_alphanumeric)
-
     stock_landings = pd.merge(
         species_landings,
         weights,
-        on=["Area", "ASFIS Scientific Name", "Location Match"],
+        on=["Area", "ASFIS Scientific Name", "Location"],
         how="inner",
         suffixes=("", "_x"),
     )
