@@ -78,4 +78,4 @@ The outputs are produced in the [/output/] folder which is created upon running 
 
 * [/clean_data/](/output/clean_data/): All cleaned and validated data produced from input files and to be used to create aggregate tables.
 * [/aggregate_tables/](/output/clean_data/): All tables aggregated to be used in report created from the cleaned data.
-* [/figures/](/output/figures/): All capture production figures based on Fishstat data 
+* [/figures/](/output/figures/): All capture production figures based on Fishstat data.s
