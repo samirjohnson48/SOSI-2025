@@ -43,9 +43,9 @@ def use_proxy_landings(
     combined_mask = no_landings_mask & has_proxy_mask
 
     if combined_mask.any():
-        merge.loc[combined_mask, landings_key] = (
-            merge.loc[combined_mask, proxy_landings_key].astype(float)
-        )
+        merge.loc[combined_mask, landings_key] = merge.loc[
+            combined_mask, proxy_landings_key
+        ].astype(float)
 
     merge["Proxy Species"] = np.where(combined_mask, merge[proxy_species_key], np.nan)
 

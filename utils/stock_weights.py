@@ -144,7 +144,7 @@ def merge_weights(
         )
         primary_key.remove("Location")
         primary_key.append("Location Match")
-        
+
     merge = pd.merge(
         weights,
         new_weights,
@@ -202,12 +202,12 @@ def compute_weights(group):
         else:
             group["Weight 2"] = group["Weight 2"].fillna(1)
             return group["Weight 2"] / group["Weight 2"].sum()
-        
+
     # Set base value of Weight 1 to 0.001
     # All stocks with species landings should get non-zero catch
     zero_mask = group["Weight 1"] == 0
     group.loc[zero_mask, "Weight 1"] = 1e-3
-        
+
     # Get all rows with valid entries for Weight 1
     val = group[
         group["Weight 1"].apply(
