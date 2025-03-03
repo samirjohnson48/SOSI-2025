@@ -567,7 +567,7 @@ def compute_appendix_landings(
 
 
 def compute_weighted_percentages(
-    stock_landings, fishstat=None, key="Area", tuna_location_to_area={}
+    stock_landings, fishstat=None, key="Area", tuna_location_to_area={}, year=2021, landings_key="Stock Landings 2021"
 ):
     data = stock_landings.copy()
 
@@ -584,17 +584,18 @@ def compute_weighted_percentages(
             for area in areas:
                 tuna_capture = fishstat[
                     (fishstat["Area"] == area) & (fishstat[sn] == row[sn])
-                ][2021].sum()
-                tuna_in_area = pd.DataFrame(
-                    {
-                        "Area": area,
-                        "ASFIS Scientific Name": row[sn],
-                        "Status": row["Status"],
-                        "Stock Landings 2021": tuna_capture,
-                    },
-                    index=[len(tuna_in_areas)],
-                )
-                tuna_in_areas = pd.concat([tuna_in_areas, tuna_in_area])
+                ][year].sum()
+                if tuna_capture > 0:
+                    tuna_in_area = pd.DataFrame(
+                        {
+                            "Area": area,
+                            "ASFIS Scientific Name": row[sn],
+                            "Status": row["Status"],
+                            landings_key: tuna_capture,
+                        },
+                        index=[len(tuna_in_areas)],
+                    )
+                    tuna_in_areas = pd.concat([tuna_in_areas, tuna_in_area])
 
         # Add the area specific tuna rows, and remove the Tuna category
         data = data[~(data["Area"] == "Tuna")]
@@ -602,7 +603,7 @@ def compute_weighted_percentages(
 
     # Group by key and Status to aggregate data
     group = (
-        data.groupby([key, "Status"])["Stock Landings 2021"].sum().unstack(fill_value=0)
+        data.groupby([key, "Status"])[landings_key].sum().unstack(fill_value=0)
     )
 
     # Add a "Global" aggregation row
