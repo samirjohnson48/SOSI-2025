@@ -31,17 +31,23 @@ def use_proxy_landings(
     stock_landings,
     proxy_landings,
     primary_key=["Area", "ASFIS Scientific Name", "Location"],
-    landings_key="Stock Landings 2021"
+    landings_key="Stock Landings 2021",
+    proxy_landings_key="Proxy Species Landings",
+    proxy_species_key="Proxy Species",
 ):
     merge = pd.merge(stock_landings, proxy_landings, on=primary_key, how="left")
 
-    no_landings_mask = (
-        merge[landings_key].isna() | merge[landings_key] == 0
-    )
-    merge.loc[no_landings_mask, landings_key] = [
-        float(val) for val in merge.loc[no_landings_mask, "Proxy Landings"].values
-    ]
-    merge.loc[~no_landings_mask, "Proxy Species"] = np.nan
+    no_landings_mask = (merge[landings_key].isna()) | (merge[landings_key] == 0)
+    has_proxy_mask = merge[proxy_landings_key].notna()
+
+    combined_mask = no_landings_mask & has_proxy_mask
+
+    if combined_mask.any():
+        merge.loc[combined_mask, landings_key] = (
+            merge.loc[combined_mask, proxy_landings_key].astype(float)
+        )
+
+    merge["Proxy Species"] = np.where(combined_mask, merge[proxy_species_key], np.nan)
 
     return merge
 
@@ -94,7 +100,7 @@ def compute_missing_landings(
             no_l_counts.get("M", 0),
             no_l_counts.get("O", 0),
         )
-        
+
         # Assign stock landings for stocks with no landings
         # (or reassign landings for Marine Fishes NEI so not to double count)
         u_mask, m_mask, o_mask = (

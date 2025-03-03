@@ -70,10 +70,10 @@ def main():
         columns={
             "AREA": "Area",
             "scientific name w value": "Proxy Species",
-            "Stock Catch Value": "Proxy Landings",
+            "Stock Catch Value": "Proxy Species Landings",
         }
     )
-    proxy_landings = proxy_landings.dropna(subset=["Proxy Landings", "Proxy Species"])
+    proxy_landings = proxy_landings.dropna(subset=["Proxy Species Landings", "Proxy Species"])
     proxy_landings = proxy_landings.drop_duplicates(
         ["Area", "ASFIS Scientific Name", "Location"]
     )
@@ -82,7 +82,7 @@ def main():
         "ASFIS Scientific Name",
         "Location",
         "Proxy Species",
-        "Proxy Landings",
+        "Proxy Species Landings",
     ]
     proxy_landings = proxy_landings[proxy_cols]
 
@@ -90,6 +90,8 @@ def main():
     sn_mask = proxy_landings["ASFIS Scientific Name"].isna()
     loc_mask = proxy_landings["Location"] == "DEMS/Crust(Cameroon)"
     proxy_landings.loc[sn_mask & loc_mask, "ASFIS Scientific Name"] = "Coastal shrimps"
+    
+    # Use the proxy landings
     stock_landings = use_proxy_landings(stock_landings, proxy_landings)
 
     # For the remaining stocks with missing landings, we use the NEI species corresponding
