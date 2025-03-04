@@ -203,6 +203,14 @@ def main():
 
     fishstat = format_fishstat(fishstat, code_to_scientific)
 
+    # Only keep data from FAO major fishing areas in analysis
+    numerical_areas = [
+        area for area in stock_assessments["Area"].unique() if isinstance(area, int)
+    ] + [48, 58, 88]
+
+    fishstat_area_mask = fishstat["Area"].isin(numerical_areas)
+    fishstat = fishstat[fishstat_area_mask]
+
     # Add ISSCAAP Code to capture data
     fishstat["ISSCAAP Code"] = fishstat["ASFIS Scientific Name"].map(
         scientific_to_isscaap
@@ -259,6 +267,11 @@ def main():
         }
     )
     aquaculture = aquaculture.drop(columns=2022)
+
+    # Only keep data for relevant areas
+    ac_area_mask = aquaculture["Area"].isin(numerical_areas)
+
+    aquaculture = aquaculture[ac_area_mask]
 
     # Create ISSCAAP Group code to name map
     isscaap_code_to_name = dict(
@@ -343,7 +356,14 @@ def main():
             "Scientific name ASFIS": "ASFIS Scientific Name",
         }
     )
-    area71_extras_mask = area71_extras["Check"] == "to ignore"
+    # Take out tunas which are in Tuna category to not double count
+    tuna_mask = stock_assessments["Area"] == "Tuna"
+    tuna_df = stock_assessments[tuna_mask][["ASFIS Scientific Name", "Location"]].copy()
+    tuna_df["Areas"] = tuna_df["Location"].map(location_to_area["Tuna"])
+    tuna_71_mask = tuna_df["Areas"].apply(lambda x: 71 in x)
+    tuna_71_list = tuna_df[tuna_71_mask]["ASFIS Scientific Name"].unique()
+
+    area71_extras_mask = (area71_extras["Check"] == "to ignore") & ~(area71_extras["ASFIS Scientific Name"].isin(tuna_71_list))
     area71_extras = area71_extras[area71_extras_mask]
 
     area71_tier1_mask = area71_extras["Tier"] == 1
@@ -361,7 +381,7 @@ def main():
             }
         }
     }
-
+    
     # Define areas for percent coverage reporting
     areas = [
         area
@@ -416,7 +436,7 @@ def main():
     # Add footnote to table describing process of computation
     pc_footnote = (
         "NOTE: Percent coverages are performed across FAO major fishing areas to be consistent with Fishstatj. \n"
-        + "Thus, landings from areas such as 'Salmon', 'Tuna', 'Deep Sea', and 'Sharks' are added back into the FAO major fishing area \n"
+        + "Thus, landings from areas such as 'Salmon', 'Tuna', and 'Sharks' are added back into the FAO major fishing area \n"
         + "from where they were reported."
     )
 
@@ -431,7 +451,7 @@ def main():
 
     # Compute weighted percentages with and w/o Tunas category
     wp_area = compute_weighted_percentages(stock_landings)
-    wp_wo_tuna = compute_weighted_percentages(
+    wp_wo_tuna, tuna_in_areas = compute_weighted_percentages(
         stock_landings,
         fishstat=fishstat,
         tuna_location_to_area=location_to_area["Tuna"],
@@ -497,8 +517,13 @@ def main():
     round_excel_file(wp_totl_fp)
 
     # Get same but w/o tunas as separate area
+    # Compute tuna landings to add back into total landings for each area
+    tuna_list = stock_assessments[tuna_mask]["ASFIS Scientific Name"].unique()
+    fs_tuna_mask = fishstat["ASFIS Scientific Name"].isin(tuna_list)
+    fs_tuna = fishstat[fs_tuna_mask].groupby("Area")[2021].sum().reset_index()
+
     wp_totl_wo_tuna = get_weighted_percentages_and_total_landings(
-        wp_wo_tuna, appendix_decs
+        wp_wo_tuna, appendix_decs, tuna_landings=fs_tuna
     )
     wp_totl_wo_tuna_fp = os.path.join(
         output_dir, "status_by_landings_w_totals_wo_tuna.xlsx"
