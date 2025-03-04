@@ -203,6 +203,11 @@ def main():
 
     fishstat = format_fishstat(fishstat, code_to_scientific)
 
+    # Add ISSCAAP Code to capture data
+    fishstat["ISSCAAP Code"] = fishstat["ASFIS Scientific Name"].map(
+        scientific_to_isscaap
+    )
+
     # Drop 2022 data from fishstat
     fishstat = fishstat.drop(columns=2022)
 
@@ -242,15 +247,6 @@ def main():
     no_seals_mask = ~(species_landings["ISSCAAP Code"] == 63)
     species_landings = species_landings[no_seals_mask]
 
-    # Define ISSCAAP Codes to remove from appendix
-    # (unless they appear in assessment, then they are added back in)
-    isscaap_to_remove = [46, 61, 62, 63, 64, 71, 72, 73, 74, 81, 82, 83, 91, 92, 93, 94]
-
-    # Add ISSCAAP Code to capture data
-    fishstat["ISSCAAP Code"] = fishstat["ASFIS Scientific Name"].map(
-        scientific_to_isscaap
-    )
-
     # Retrieve aquaculture landings and reformat
     aquaculture = pd.read_csv(
         os.path.join(input_dir, "global_aquaculture_production.csv")
@@ -279,6 +275,11 @@ def main():
     # Retrieve location to area mappings for Tuna, Deep Sea, Sharks
     with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
         location_to_area = json.load(file)
+
+    # Define ISSCAAP Codes to remove from appendix landings,
+    # and later the percent coverage calculations as well.
+    # (unless they appear in assessment, then they are added back in to total area landings)
+    isscaap_to_remove = [46, 61, 62, 63, 64, 71, 72, 73, 74, 81, 82, 83, 91, 92, 93, 94]
 
     # Compute appendix landings
     appendix_decs, appendix_years = compute_appendix_landings(
@@ -360,15 +361,19 @@ def main():
             }
         }
     }
+
+    # Define areas for percent coverage reporting
     areas = [
         area
         for area in stock_landings["Area"].unique()
         if isinstance(area, int) or area == "48,58,88"
     ]
+
     pc = compute_percent_coverage(
         stock_landings,
         fishstat,
         areas,
+        isscaap_to_remove,
         assessment="Update",
         location_to_area=location_to_area,
         extra_stocks_map=extra_stocks_map,
@@ -379,20 +384,28 @@ def main():
         stock_landings,
         fishstat,
         areas,
+        isscaap_to_remove,
         extra_stocks_map=extra_stocks_map,
         location_to_area=location_to_area,
     )
     # Retrieve SOFIA with landings
     sofia_landings = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
-    sofia_landings.loc[sofia_landings["Area"].isin([48, 58, 88]), "Area"] = "48,58,88"
+
+    # Combine areas 48,58,88
+    sofia_southern_mask = sofia_landings["Area"].isin([48, 58, 88])
+    sofia_landings.loc[sofia_southern_mask, "Area"] = "48,58,88"
+
+    # Add ISSCAAP Code to SOFIA data
+    sofia_landings["ISSCAAP Code"] = sofia_landings["Proxy"].map(scientific_to_isscaap)
 
     # Compute percent coverage for SOFIA data
     pc_sofia = compute_percent_coverage(
         sofia_landings,
         fishstat,
         areas,
+        isscaap_to_remove,
         assessment="Previous",
-        key="Proxy",
+        sn_key="Proxy",
         landings_key=2021,
         location_to_area=location_to_area,
     )
@@ -425,13 +438,6 @@ def main():
     )
 
     # Compute weighted percentages for SOFIA
-    # Retrieve SOFIA assessments with landings
-    sofia_landings = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
-
-    # Set stocks in Areas 48,58,88 to Area 48,58,88
-    mask_485888 = sofia_landings["Area"].isin([48, 58, 88])
-    sofia_landings.loc[mask_485888, "Area"] = "48,58,88"
-
     # Get assessed stocks from SOFIA data
     sofia_landings_assessed = sofia_landings.rename(columns={"Status": "Status Old"})
     sofia_landings_assessed["Status"] = sofia_landings_assessed["Status Old"].apply(
