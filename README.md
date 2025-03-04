@@ -53,7 +53,7 @@ These are the scripts used to produce the analysis [outputs](/output/).
 To run any of these scripts individually, change directory to parent directory [SOSI-2025] as run the following (e.g. for [stock_assessments.py](/scripts/stock_assessments.py)):
 
 ```
-python3 -m scripts.stock_assessments.py
+python3 -m scripts.stock_assessments
 ```
 
 The scripts are described below, in the order of the full data pipeline:
