@@ -485,34 +485,38 @@ def compute_appendix_landings(
             area_list = [48, 58, 88]
         else:
             area_list = [area]
-            
+
         # Define Tuna, Shark, and Salmon masks
         # These will be taken out of numerical areas so as to not double count
-        
+
         # Tunas
         sl_tuna_mask = species_landings["Area"] == "Tuna"
         tuna_list = species_landings[sl_tuna_mask]["ASFIS Scientific Name"].unique()
         tuna_mask_cap = fishstat["ASFIS Scientific Name"].isin(tuna_list)
         tuna_mask_aqua = aquaculture["ISSCAAP Code"] == 36
-        
+
         # Sharks
         sl_sharks_mask = species_landings["Area"] == "Sharks"
         sharks_list = species_landings[sl_sharks_mask]["ASFIS Scientific Name"].unique()
         sharks_mask_cap = fishstat["ASFIS Scientific Name"].isin(sharks_list)
         sharks_mask_aqua = aquaculture["ISSCAAP Code"] == 38
-        
+
         # Salmon
         sl_salmon_mask = species_landings["Area"] == "Salmon"
         salmon_list = species_landings[sl_salmon_mask]["ASFIS Scientific Name"].unique()
-        salmon_mask_cap = fishstat["ASFIS Scientific Name"].isin(salmon_list) & (fishstat["Area"] == 67)
-        salmon_mask_aqua = (aquaculture["ISSCAAP Code"] == 23) & (aquaculture["Area"] == 67)
-        
+        salmon_mask_cap = fishstat["ASFIS Scientific Name"].isin(salmon_list) & (
+            fishstat["Area"] == 67
+        )
+        salmon_mask_aqua = (aquaculture["ISSCAAP Code"] == 23) & (
+            aquaculture["Area"] == 67
+        )
+
         # Masks for numerical areas
         area_mask_cap = fishstat["Area"].isin(area_list)
         area_mask_aqua = aquaculture["Area"].isin(area_list)
         isscaap_mask_cap = ~fishstat["ISSCAAP Code"].isin(isscaap_to_remove)
         isscaap_mask_aqua = ~aquaculture["ISSCAAP Code"].isin(isscaap_to_remove)
-        
+
         # Define total landings for the areas
         if area == "Tuna":
             cap = fishstat[tuna_mask_cap]
@@ -526,52 +530,56 @@ def compute_appendix_landings(
         else:
             # Take out Tuna, Sharks, and Salmon from numerical areas
             cap = fishstat[
-                area_mask_cap & 
-                isscaap_mask_cap &
-                ~tuna_mask_cap &
-                ~sharks_mask_cap &
-                ~salmon_mask_cap
+                area_mask_cap
+                & isscaap_mask_cap
+                & ~tuna_mask_cap
+                & ~sharks_mask_cap
+                & ~salmon_mask_cap
             ]
             # Add tuna and sharks which were listed in numerical areas back to total capture
             sl_area_mask = species_landings["Area"] == area
-            
+
             tuna_mask = species_landings["ASFIS Scientific Name"].isin(tuna_list)
-            tuna_in_area = species_landings[sl_area_mask&tuna_mask].drop_duplicates(subset="ASFIS Scientific Name")
-            
+            tuna_in_area = species_landings[sl_area_mask & tuna_mask].drop_duplicates(
+                subset="ASFIS Scientific Name"
+            )
+
             if not tuna_in_area.empty:
                 cap = pd.concat([cap, tuna_in_area])
-            
+
             sharks_mask = species_landings["ASFIS Scientific Name"].isin(sharks_list)
-            sharks_in_area = species_landings[sl_area_mask&sharks_mask].drop_duplicates(subset="ASFIS Scientific Name")
-            
+            sharks_in_area = species_landings[
+                sl_area_mask & sharks_mask
+            ].drop_duplicates(subset="ASFIS Scientific Name")
+
             if not sharks_in_area.empty:
                 cap = pd.concat([cap, sharks_in_area])
-            
+
             aqua = aquaculture[
-                area_mask_aqua &
-                isscaap_mask_aqua &
-                ~tuna_mask_aqua & 
-                ~sharks_mask_aqua &
-                ~salmon_mask_aqua
+                area_mask_aqua
+                & isscaap_mask_aqua
+                & ~tuna_mask_aqua
+                & ~sharks_mask_aqua
+                & ~salmon_mask_aqua
             ]
 
         cap = create_decade_cols(cap)
         cap = cap.drop(columns=["Alpha3_Code"])
-        
+
         total_cap = cap[get_numeric_cols(cap.columns)].sum() / 1e3
-        
+
         if area in landings_to_add["Area"].unique():
             additional_landings = landings_to_add[landings_to_add["Area"] == area][
                 get_numeric_cols(landings_to_add.columns)
             ].sum()
             total_cap = total_cap.add(additional_landings, fill_value=0)
-            
+
         diff_cap = total_cap - total_area
 
         total_aqua = aqua[get_numeric_cols(aqua.columns)].sum() / 1e3
 
         total_production = total_cap + total_aqua
-        
+
         total_area = total_area.to_frame().T
         total_area["ASFIS Name"] = "Total selected species groups"
         total_cap = total_cap.to_frame().T
@@ -708,7 +716,7 @@ def compute_weighted_percentages(
     )
 
     result.index.name = key
-    
+
     # Returns the tunas added back into areas if applicable
     if tuna_location_to_area and key == "Area":
         return result, tuna_in_areas
@@ -725,15 +733,21 @@ def get_weighted_percentages_and_total_landings(
         # Check if tunas have been taken out as separate category
         if not tuna_landings.empty and area == "Tuna":
             continue
-        
+
         if isinstance(area, str) and area.isdigit():
             area = int(area)
 
-        tot = df.loc[df["ASFIS Name"] == "Total marine capture", 2021].values[0] / 1e3 # Convert to Mt
-        
+        tot = (
+            df.loc[df["ASFIS Name"] == "Total marine capture", 2021].values[0] / 1e3
+        )  # Convert to Mt
+
         if not tuna_landings.empty:
-            tl_area_mask = tuna_landings["Area"].isin([48,58,88]) if area == "48,58,88" else tuna_landings["Area"] == area
-            tl = tuna_landings.loc[tl_area_mask, year].values / 1e6 # Convert to Mt
+            tl_area_mask = (
+                tuna_landings["Area"].isin([48, 58, 88])
+                if area == "48,58,88"
+                else tuna_landings["Area"] == area
+            )
+            tl = tuna_landings.loc[tl_area_mask, year].values / 1e6  # Convert to Mt
             if tl:
                 tot += tl
 
@@ -769,7 +783,7 @@ def get_weighted_percentages_and_total_landings(
         [("", "Total Landings (Mt)"), ("", "Total Assessed Landings (Mt)")]
         + [col for col in result.columns if col[0] == "Weighted % by Landings"]
     ]
-    
+
     return result
 
 
@@ -837,57 +851,81 @@ def get_weighted_percentages_by_tier_and_area(stock_landings, total_landings):
                 for col in cols_to_drop
             ]
         )
-        tier1_cols = [col for col in d2.columns if col[0] == "Tier 1" and col[1] == "Weighted % by Landings"]
-        tier2_cols = [col for col in d2.columns if col[0] == "Tier 2" and col[1] == "Weighted % by Landings"]
-        tier3_cols = [col for col in d2.columns if col[0] == "Tier 3" and col[1] == "Weighted % by Landings"]
-        col_sort = [("", "", "Area"), ("", "", "Total Landings in Area (Mt)")] + \
-            [("Tier 1", "", "Total Landings (Mt)")] + tier1_cols + \
-                [("Tier 2", "", "Total Landings (Mt)")] + tier2_cols + \
-                    [("Tier 3", "", "Total Landings (Mt)")] + tier3_cols
-                    
+        tier1_cols = [
+            col
+            for col in d2.columns
+            if col[0] == "Tier 1" and col[1] == "Weighted % by Landings"
+        ]
+        tier2_cols = [
+            col
+            for col in d2.columns
+            if col[0] == "Tier 2" and col[1] == "Weighted % by Landings"
+        ]
+        tier3_cols = [
+            col
+            for col in d2.columns
+            if col[0] == "Tier 3" and col[1] == "Weighted % by Landings"
+        ]
+        col_sort = (
+            [("", "", "Area"), ("", "", "Total Landings in Area (Mt)")]
+            + [("Tier 1", "", "Total Landings (Mt)")]
+            + tier1_cols
+            + [("Tier 2", "", "Total Landings (Mt)")]
+            + tier2_cols
+            + [("Tier 3", "", "Total Landings (Mt)")]
+            + tier3_cols
+        )
+
         return d2[col_sort]
 
     for area in areas:
         area_df = wp_tier(stock_landings, area)
         areas_df = pd.concat([areas_df, area_df])
-        
+
     global_df = wp_tier(stock_landings)
-    
+
     areas_df = pd.concat([areas_df, global_df])
 
     return areas_df
 
-def remove_isscaap_fishstat(fishstat, stock_landings, isscaap_to_remove, landings_key, year):
+
+def remove_isscaap_fishstat(
+    fishstat, stock_landings, isscaap_to_remove, landings_key, year
+):
     sl, fs = stock_landings.copy(), fishstat.copy()
     fs_isscaap_mask = ~fs["ISSCAAP Code"].isin(isscaap_to_remove)
     sl_isscaap_mask = sl["ISSCAAP Code"].isin(isscaap_to_remove)
-    
+
     # Take out ISSCAAP Groups from Fishstat
     fs = fs[fs_isscaap_mask]
-    
+
     # Add landings back to Fishstat from Stock Landings which are in ISSCAAP to remove
-    lta = sl[sl_isscaap_mask][["Area", "ASFIS Scientific Name", "Location", "ISSCAAP Code"]+[landings_key]]
-    
+    lta = sl[sl_isscaap_mask][
+        ["Area", "ASFIS Scientific Name", "Location", "ISSCAAP Code"] + [landings_key]
+    ]
+
     # Convert Areas 48,58,88 back to original area
-    lta_southern_mask = lta["Area"]=="48,58,88"
-    
+    lta_southern_mask = lta["Area"] == "48,58,88"
+
     def loc_to_area_southern(loc):
         # Default to Area 48 if area cannot be found
         # Areas 48,58,88 are aggregated anyways in compute_percent_coverage
         if pd.isna(loc):
             return 48
-        
+
         area = loc.split(".")[0]
-        
-        return int(area) if area.isdigit() else 48 
-    
-    lta.loc[lta_southern_mask, "Area"] = lta.loc[lta_southern_mask, "Location"].apply(loc_to_area_southern)
-    
+
+        return int(area) if area.isdigit() else 48
+
+    lta.loc[lta_southern_mask, "Area"] = lta.loc[lta_southern_mask, "Location"].apply(
+        loc_to_area_southern
+    )
+
     lta = lta.drop(columns="Location")
     lta = lta.rename(columns={landings_key: year})
-    
+
     fs = pd.concat([fs, lta])
-    
+
     return fs
 
 
@@ -913,13 +951,15 @@ def compute_percent_coverage(
         sl = stock_landings.copy()
 
     percent_coverage = {}
-    
+
     # Remove ISSCAAP groups from Fishstat data for correct total landings per area
-    fs = remove_isscaap_fishstat(fishstat, stock_landings, isscaap_to_remove, landings_key, year)
+    fs = remove_isscaap_fishstat(
+        fishstat, stock_landings, isscaap_to_remove, landings_key, year
+    )
 
     for area in areas:
         coverage = sl[sl["Area"] == area][landings_key].sum()
-                
+
         fs_area_mask = fs["Area"] == area
 
         # See if additional unassessed stocks need to be added to coverage
@@ -931,8 +971,10 @@ def compute_percent_coverage(
             for t, extra_stocks in extra_stocks_tiers.items():
                 if not tier or t == tier:
                     extra_stocks_mask = fs["ASFIS Scientific Name"].isin(extra_stocks)
-                    
-                    extra_stocks_coverage = fs[extra_stocks_mask & fs_area_mask][year].sum()
+
+                    extra_stocks_coverage = fs[extra_stocks_mask & fs_area_mask][
+                        year
+                    ].sum()
 
                     coverage += extra_stocks_coverage
                     extra_stocks_total += extra_stocks_coverage
@@ -945,15 +987,15 @@ def compute_percent_coverage(
             # Make sure not to double count stocks
             if row[sn_key] not in extra_stocks_added:
                 tuna_areas = location_to_area["Tuna"][row["Location"]]
-                
+
                 tuna_mask = fs["ASFIS Scientific Name"] == row[sn_key]
-                
+
                 if area in tuna_areas:
                     tuna_coverage = fs[tuna_mask & fs_area_mask][year].sum()
                     coverage += tuna_coverage
                     tuna_total += tuna_coverage
-                elif area == "48,58,88": # Check for Tunas in areas 48,58,88
-                    tuna_s_areas = [a for a in [48,58,88] if a in tuna_areas]
+                elif area == "48,58,88":  # Check for Tunas in areas 48,58,88
+                    tuna_s_areas = [a for a in [48, 58, 88] if a in tuna_areas]
                     if tuna_s_areas:
                         tuna_s_mask = fs["Area"].isin(tuna_s_areas)
                         tuna_coverage = fs[tuna_mask & tuna_s_mask][year].sum()
@@ -971,15 +1013,15 @@ def compute_percent_coverage(
             # Make sure not to double count stocks
             if row[sn_key] not in extra_stocks_added:
                 sharks_areas = location_to_area["Sharks"][row["Location"]]
-                
+
                 sharks_mask = fs["ASFIS Scientific Name"] == row[sn_key]
-                
+
                 if area in sharks_areas:
                     sharks_coverage = fs[sharks_mask & fs_area_mask][year].sum()
                     coverage += sharks_coverage
                     sharks_total += sharks_coverage
-                elif area == "48,58,88": # Check for sharks in areas 48,58,88
-                    sharks_s_areas = [a for a in [48,58,88] if a in sharks_areas]
+                elif area == "48,58,88":  # Check for sharks in areas 48,58,88
+                    sharks_s_areas = [a for a in [48, 58, 88] if a in sharks_areas]
                     if sharks_s_areas:
                         sharks_s_mask = fs["Area"].isin(sharks_s_areas)
                         sharks_coverage = fs[tuna_mask & sharks_s_mask][year].sum()
@@ -988,9 +1030,7 @@ def compute_percent_coverage(
 
         # Calculate area's total landings
         total_area_mask = (
-            fs["Area"].isin([48, 58, 88])
-            if area == "48,58,88"
-            else fs["Area"] == area
+            fs["Area"].isin([48, 58, 88]) if area == "48,58,88" else fs["Area"] == area
         )
         total_landings = fs[total_area_mask][year].sum()
 
@@ -1003,8 +1043,8 @@ def compute_percent_coverage(
             percent_coverage["Global"]["Coverage"] += coverage
             percent_coverage["Global"]["Total Landings"] += total_landings
 
-        percent_coverage[area] = coverage / total_landings * 100        
-            
+        percent_coverage[area] = coverage / total_landings * 100
+
     percent_coverage["Global"] = (
         percent_coverage["Global"]["Coverage"]
         / percent_coverage["Global"]["Total Landings"]
@@ -1016,9 +1056,14 @@ def compute_percent_coverage(
 
 
 def compute_percent_coverage_tiers(
-    stock_landings, fishstat, areas, isscaap_to_remove, extra_stocks_map={}, location_to_area={}
+    stock_landings,
+    fishstat,
+    areas,
+    isscaap_to_remove,
+    extra_stocks_map={},
+    location_to_area={},
 ):
-    tiers = [1,2,3,"Missing"]
+    tiers = [1, 2, 3, "Missing"]
     pc_tiers = []
     for tier in tiers:
         pc_tier = compute_percent_coverage(
@@ -1033,10 +1078,9 @@ def compute_percent_coverage_tiers(
         rename_col = f"Tier {tier}" if isinstance(tier, int) else "No Tier"
         pc_tier = pc_tier.rename(columns={"Coverage (%) Update": rename_col})
         pc_tiers.append(pc_tier)
-        
-    pc_update = reduce(lambda left,right: pd.merge(left, right, on="Area"),
-                       pc_tiers)
-    
+
+    pc_update = reduce(lambda left, right: pd.merge(left, right, on="Area"), pc_tiers)
+
     pc_update["Total"] = (
         pc_update["Tier 1"]
         + pc_update["Tier 2"]

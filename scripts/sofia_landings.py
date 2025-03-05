@@ -114,9 +114,9 @@ def main():
 
     year_start, year_end = 1950, 2021
     years = list(range(year_start, year_end + 1))
-    
+
     tqdm.pandas()
-    
+
     sofia[years] = sofia.progress_apply(
         compute_species_landings,
         args=(

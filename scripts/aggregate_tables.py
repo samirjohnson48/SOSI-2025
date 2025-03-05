@@ -436,8 +436,9 @@ def main():
     # Add footnote to table describing process of computation
     pc_footnote = (
         "NOTE: Percent coverages are performed across FAO major fishing areas to be consistent with Fishstatj. \n"
-        + "Thus, landings from areas such as 'Salmon', 'Tuna', and 'Sharks' are added back into the FAO major fishing area \n"
-        + "from where they were reported."
+        + "Thus, landings from areas such as 'Salmon', 'Tuna', and 'Sharks' are added back into the FAO major fishing area from where they were reported. \n"
+        + f"Percent coverage calculations do not include landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
+        + "except for stocks from these groups which are included in the assessment."
     )
 
     pc_comp_fp = os.path.join(output_dir, "percent_coverage_comparison.xlsx")
@@ -508,9 +509,11 @@ def main():
     # Save wp w/totals w/footnote explaining why assessed landings / total landings * 100
     # per area does not correspond to the percent coverage (doesn't account for addition of Tuna landings, etc.)
     sbl_footnote = (
-        "Note: Percent coverage in this sheet (Total Assessed Landings / Total Landings * 100) does not reflect reported percent coverage. \n"
-        + "For percent coverage, the landings of 'Salmon', 'Tuna', 'Deep Sea' and 'Sharks' are incorporated in the FAO major fishing areas \n"
-        + "from which their landings are reported. Thus, percent coverage calculated from this table will appear lower than reported elsewhere."
+        "Note: Percent coverage in this sheet does not reflect reported percent coverage. For the reported percent coverage, \n"
+        + "the landings of 'Salmon', 'Tuna', and 'Sharks' are incorporated in the FAO major fishing areas \n"
+        + "from which their landings are reported. Thus, percent coverage calculated from this table will slightly different than reported elsewhere. \n"
+        + f"Area landings exclude landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
+        + "except for stocks which have been incorporated in assessment."
     )
     wp_totl_fp = os.path.join(output_dir, "status_by_landings_w_totals_area.xlsx")
     add_footnote(wp_totl, sbl_footnote, multi_index=True).to_excel(wp_totl_fp)
