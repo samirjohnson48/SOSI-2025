@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 import json
+from tqdm import tqdm
 
 from utils.sofia_landings import *
 from utils.species_landings import format_fishstat, compute_species_landings
@@ -113,7 +114,10 @@ def main():
 
     year_start, year_end = 1950, 2021
     years = list(range(year_start, year_end + 1))
-    sofia[years] = sofia.apply(
+    
+    tqdm.pandas()
+    
+    sofia[years] = sofia.progress_apply(
         compute_species_landings,
         args=(
             fishstat,

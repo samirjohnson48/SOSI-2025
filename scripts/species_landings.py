@@ -25,6 +25,7 @@ import os
 import pandas as pd
 import numpy as np
 import json
+from tqdm import tqdm
 
 from utils.species_landings import *
 from utils.stock_assessments import get_asfis_mappings
@@ -65,7 +66,8 @@ def main():
     years = list(range(year_start, year_end + 1))
 
     print("Computing species landings...")
-    species_landings[years] = species_landings.apply(
+    tqdm.pandas()
+    species_landings[years] = species_landings.progress_apply(
         compute_species_landings, args=(fishstat, location_to_area), axis=1
     )
 
