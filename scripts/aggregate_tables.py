@@ -215,7 +215,7 @@ def main():
     fishstat["ISSCAAP Code"] = fishstat["ASFIS Scientific Name"].map(
         scientific_to_isscaap
     )
-
+    
     # Drop 2022 data from fishstat
     fishstat = fishstat.drop(columns=2022)
 

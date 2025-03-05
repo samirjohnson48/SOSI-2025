@@ -532,6 +532,21 @@ def compute_appendix_landings(
                 ~sharks_mask_cap &
                 ~salmon_mask_cap
             ]
+            # Add tuna and sharks which were listed in numerical areas back to total capture
+            sl_area_mask = species_landings["Area"] == area
+            
+            tuna_mask = species_landings["ASFIS Scientific Name"].isin(tuna_list)
+            tuna_in_area = species_landings[sl_area_mask&tuna_mask].drop_duplicates(subset="ASFIS Scientific Name")
+            
+            if not tuna_in_area.empty:
+                cap = pd.concat([cap, tuna_in_area])
+            
+            sharks_mask = species_landings["ASFIS Scientific Name"].isin(sharks_list)
+            sharks_in_area = species_landings[sl_area_mask&sharks_mask].drop_duplicates(subset="ASFIS Scientific Name")
+            
+            if not sharks_in_area.empty:
+                cap = pd.concat([cap, sharks_in_area])
+            
             aqua = aquaculture[
                 area_mask_aqua &
                 isscaap_mask_aqua &
@@ -542,21 +557,21 @@ def compute_appendix_landings(
 
         cap = create_decade_cols(cap)
         cap = cap.drop(columns=["Alpha3_Code"])
-
+        
         total_cap = cap[get_numeric_cols(cap.columns)].sum() / 1e3
-
+        
         if area in landings_to_add["Area"].unique():
             additional_landings = landings_to_add[landings_to_add["Area"] == area][
                 get_numeric_cols(landings_to_add.columns)
             ].sum()
             total_cap = total_cap.add(additional_landings, fill_value=0)
-
+            
         diff_cap = total_cap - total_area
 
         total_aqua = aqua[get_numeric_cols(aqua.columns)].sum() / 1e3
 
         total_production = total_cap + total_aqua
-
+        
         total_area = total_area.to_frame().T
         total_area["ASFIS Name"] = "Total selected species groups"
         total_cap = total_cap.to_frame().T
