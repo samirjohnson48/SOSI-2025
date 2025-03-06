@@ -12,8 +12,9 @@ Inputs
 Outputs
     - ./output/clean_data/stock_assessments_w_unassessed.xlsx: complete list of assessed and unassessed stocks from sheets
     - ./output/clean_data/stock_assessments.xlsx: complete list of assessed stocks (Status is 'U', 'M' or 'O')
+    - ./output/clean_data/special_group_stocks.xlsx: list of all assessed species within special groups (Deep Sea, Salmon, Sharks, and Tuna)
 
-Output schema (primary key = [Area, ASFIS Scientific Name, Location]):
+Output schema for stock assessments(primary key = [Area, ASFIS Scientific Name, Location]):
     - Area: The group of stocks which are found in separate sheets from input
         Most of the time, this is an FAO major fishing area (21, 27, etc.)
         However, this can include other types of aggregations, such as 
@@ -746,6 +747,17 @@ def main():
     )
     assessed_stocks.to_excel(
         os.path.join(output_dir, "stock_assessments.xlsx"), index=False
+    )
+    
+    # Save list of all species moved to special groups
+    special_groups = ["Deep Sea", "Salmon", "Sharks", "Tuna"]
+    special_groups_mask = assessed_stocks["Area"].isin(special_groups)
+    special_group_stocks = assessed_stocks[special_groups_mask][["ASFIS Scientific Name", "Area"]]
+    special_group_stocks = special_group_stocks.drop_duplicates()
+    special_group_stocks = special_group_stocks.rename(columns={"Area": "Group"})
+    
+    special_group_stocks.to_excel(
+        os.path.join(output_dir, "special_group_stocks.xlsx"), index=False
     )
 
 
