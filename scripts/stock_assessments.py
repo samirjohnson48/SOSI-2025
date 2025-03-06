@@ -752,12 +752,12 @@ def main():
     # Save list of all species moved to special groups
     special_groups = ["Deep Sea", "Salmon", "Sharks", "Tuna"]
     special_groups_mask = assessed_stocks["Area"].isin(special_groups)
-    special_group_stocks = assessed_stocks[special_groups_mask][["ASFIS Scientific Name", "Area"]]
-    special_group_stocks = special_group_stocks.drop_duplicates()
-    special_group_stocks = special_group_stocks.rename(columns={"Area": "Group"})
+    special_group_species = assessed_stocks[special_groups_mask][["ASFIS Scientific Name", "Area"]]
+    special_group_species = special_group_species.drop_duplicates()
+    special_group_species = special_group_species.rename(columns={"Area": "Group"})
     
-    special_group_stocks.to_excel(
-        os.path.join(output_dir, "special_group_stocks.xlsx"), index=False
+    special_group_species.to_excel(
+        os.path.join(output_dir, "special_group_species.xlsx"), index=False
     )
 
 
