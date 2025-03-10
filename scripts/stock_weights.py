@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import numpy as np
 import json
+from tqdm import tqdm
 
 from utils.stock_weights import *
 from utils.stock_assessments import fix_nan_location
@@ -110,11 +111,15 @@ def main():
     weights["Area Specific"] = weights[["Area", "Location"]].apply(
         specify_area, args=(location_to_area,), axis=1
     )
+    
+    # Progress bar
+    tqdm.pandas()
+    
     weights["Normalized Weight"] = (
         weights.groupby(["Area Specific", "ASFIS Scientific Name"])[
             ["Weight 1", "Weight 2"]
         ]
-        .apply(compute_weights)
+        .progress_apply(compute_weights)
         .reset_index(level=[0, 1], drop=True)
     )
 
