@@ -46,6 +46,8 @@ def main():
     # Compute Status by Number grouped by Area and Tier
     sbn_area = compute_status_by_number(stock_assessments, "Area")
     sbn_tier = compute_status_by_number(stock_assessments, "Tier")
+    
+    vc_tier_area = compute_count_for_group(stock_assessments, group_col="Area", count_col="Tier")
 
     sofia_indices = {
         "Area 21": (46, 0, 0),
@@ -159,6 +161,10 @@ def main():
     sbn_comp_fp = os.path.join(output_dir, "compare_status_by_number.xlsx")
     sbn_comp.to_excel(sbn_comp_fp)
     round_excel_file(sbn_comp_fp)
+    
+    # Save value counts for tier across areas
+    vc_tier_area_fp = os.path.join(output_dir, "value_counts_tier_by_area.xlsx")
+    vc_tier_area.to_excel(vc_tier_area_fp)
 
     # Create summary of stocks and save file
     sos = compute_summary_of_stocks(stock_assessments_full)

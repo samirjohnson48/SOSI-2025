@@ -64,6 +64,21 @@ def add_footnote(df, footnote_text, multi_index=False):
 
     return df_with_footnote
 
+def compute_count_for_group(df, group_col="Area", count_col="Tier"):
+    counts = df.groupby(group_col)[count_col].value_counts().unstack(fill_value=0)
+    
+    total = counts.sum(numeric_only=True)
+    
+    counts.loc["Global"] = total
+    
+    rename_cols = {col: f"{count_col} {col}" for col in counts.columns}
+    
+    counts = counts.rename(columns=rename_cols)
+    
+    counts['Total'] = counts.sum(axis=1)
+    
+    return counts
+
 
 def compute_status_by_number(data, group):
     grouped = (
@@ -607,7 +622,7 @@ def compute_appendix_landings(
         )
 
         dec_cols = [
-            f"{start}-{start+9}" for start in range(year_start, last_decade_year, 10)
+            f"{start}-{start+9}" for start in range(year_start, last_decade_year+1, 10)
         ] + [f"{last_decade_year+10}-{year_end}"]
         area_summary_years = area_summary.drop(columns=dec_cols)
 
