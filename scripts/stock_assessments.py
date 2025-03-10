@@ -336,7 +336,7 @@ def main():
     # Helper function to make the shark location from the columns Ocean and Area
     def make_shark_loc(row):
         ocean, area, area_number = row["Ocean"], row["FAO Area"], row["Area Number"]
-        
+
         area_number = str(area_number)
         area_number = area_number.replace(" & ", ", ")
 
@@ -348,9 +348,9 @@ def main():
 
         return ocean + " " + area + f" -  Area(s) {area_number}"
 
-    overview["Sharks"]["Location"] = overview["Sharks"][["Ocean", "FAO Area", "Area Number"]].apply(
-        make_shark_loc, axis=1
-    )
+    overview["Sharks"]["Location"] = overview["Sharks"][
+        ["Ocean", "FAO Area", "Area Number"]
+    ].apply(make_shark_loc, axis=1)
     # All Shark assessments are tier 1 and ISSCAAP Code 38
     overview["Sharks"]["Tier"] = 1
     overview["Sharks"]["ISSCAAP Code"] = 38

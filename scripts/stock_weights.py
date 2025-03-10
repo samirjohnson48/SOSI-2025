@@ -111,10 +111,10 @@ def main():
     weights["Area Specific"] = weights[["Area", "Location"]].apply(
         specify_area, args=(location_to_area,), axis=1
     )
-    
+
     # Progress bar
     tqdm.pandas()
-    
+
     weights["Normalized Weight"] = (
         weights.groupby(["Area Specific", "ASFIS Scientific Name"])[
             ["Weight 1", "Weight 2"]
