@@ -79,6 +79,25 @@
         ]
     },
     "Sharks": {
+        "Pacific Eastern Central -  Area(s) 77": [
+            77
+        ],
+        "Pacific Southeast -  Area(s) 87": [
+            87
+        ],
+        "Pacific Central -  Area(s) 71, 77": [
+            71,
+            77
+        ],
+        "Indian Ocean -  Area(s) 51": [
+            51
+        ],
+        "Indian Ocean -  Area(s) 57": [
+            57
+        ],
+        "Pacific Western Central -  Area(s) 71": [
+            71
+        ],
         "Global/All areas": [
             21,
             27,
@@ -99,59 +118,96 @@
             87,
             88
         ],
-        "Atlantic North": [
-            21,
+        "Mediterranean and Black Sea -  Area(s) 37": [
+            37
+        ],
+        "Atlantic North -  Area(s) 27, 21": [
+            27,
+            21
+        ],
+        "Atlantic South -  Area(s) 41, 47": [
+            41,
+            47
+        ],
+        "Indian Ocean -  Area(s) 57, 51": [
+            57,
+            51
+        ],
+        "Pacific North -  Area(s) 61, 67": [
+            61,
+            67
+        ],
+        "Pacific South -  Area(s) 81, 87": [
+            81,
+            87
+        ],
+        "Atlantic Northeast -  Area(s) 27": [
             27
         ],
-        "Atlantic South": [
+        "Atlantic Northwest -  Area(s) 21": [
+            21
+        ],
+        "Atlantic Southern -  Area(s) 41, 47": [
             41,
             47
         ],
-        "Atlantic Northeast": [27],
-        "Atlantic Northwest": [21],
-        "Atlantic Southern": [
-            41,
-            47
+        "Pacific Southern -  Area(s) 81, 87": [
+            81,
+            87
         ],
-        "Indian Ocean": [
-            51,
-            57
+        "Atlantic North -  Area(s) 34": [
+            34
         ],
-        "Indian Ocean, Eastern": [57],
-        "Indian Ocean, Western": [51],
-        "Mediterranean and Black Sea": [37],
-        "Pacific Central": [
-            71,
+        "Atlantic South -  Area(s) 27": [
+            27
+        ],
+        "Pacific North -  Area(s) 77": [
             77
         ],
-        "Pacific North": [61],
-        "Pacific South": [
-            81,
+        "Pacific South -  Area(s) 87": [
             87
-        ],
-        "Pacific Southeast": [87],
-        "Pacific Eastern Central": [77],
-        "Pacific Southern": [
-            81,
-            87
-        ],
-        "Pacific Western Central": [71],
-        "Pacific  Western Central": [71]
+        ]
     },
     "Deep Sea": {
-        "MAR ": [27],
-        "Corner Rise seamounts": [21],
-        "Divisions 3LN Grand Bank": [21],
-        "Divisions 3O Grand Bank": [21],
-        "Divisions 3NO Grand Bank": [21],
-        "Grand Bank 3LNO": [21],
-        "Kerguelan Plateau (Willaims Ridge) and": [58],
-        "SA3 + 4": [21],
-        "SEAFO: SE Atlantic": [47],
-        "3LNO": [21],
-        "Division 3M": [21],
-        "Division 3LNO": [21],
-        "3NO": [21],
+        "MAR ": [
+            27
+        ],
+        "Corner Rise seamounts": [
+            21
+        ],
+        "Divisions 3LN Grand Bank": [
+            21
+        ],
+        "Divisions 3O Grand Bank": [
+            21
+        ],
+        "Divisions 3NO Grand Bank": [
+            21
+        ],
+        "Grand Bank 3LNO": [
+            21
+        ],
+        "Kerguelan Plateau (Willaims Ridge) and Del Cano Rise": [
+            51
+        ],
+        "SA3 + 4": [
+            21
+        ],
+        "SEAFO: SE Atlantic": [
+            47
+        ],
+        "3LNO": [
+            21
+        ],
+        "Division 3M": [
+            21
+        ],
+        "Division 3LNO": [
+            21
+        ],
+        "3NO": [
+            21
+        ],
         "NPFC: N Pacific": [
             61,
             67

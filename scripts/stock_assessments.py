@@ -273,14 +273,17 @@ def main():
     # Clean up Deep Sea dataframe
     # Forward fill the Region column
     overview["Deep Sea"] = ffill_columns(overview["Deep Sea"], "Region")
+
     # Rows without ASFIS Name are blanks in original sheet
     overview["Deep Sea"] = (
         overview["Deep Sea"].dropna(subset=["ASFIS Name"]).reset_index(drop=True)
     )
+
     # Fix Location
     overview["Deep Sea"]["Location"] = fill_col_na(
         overview["Deep Sea"], "Location", "Region"
     )
+
     # Values for Status, Uncertainty, and Tier are spread out over two columns
     # based on how original sheet was formatted
     overview["Deep Sea"]["Status"] = fill_col_na(
@@ -292,6 +295,7 @@ def main():
     overview["Deep Sea"]["Tier"] = fill_col_na(
         overview["Deep Sea"], "Unnamed: 7", "Tier"
     )
+
     # Use the ASFIS Names in the original dataset to find the ASFIS Scientific Name
     overview["Deep Sea"]["ASFIS Scientific Name"] = overview["Deep Sea"][
         "ASFIS Name"
@@ -312,10 +316,12 @@ def main():
         .apply(get_common_name, args=(scientific_to_name,))
         .fillna(overview["Deep Sea"]["ASFIS Name"])
     )
+
     # Retrieve ISSCAAP Code
     overview["Deep Sea"]["ISSCAAP Code"] = overview["Deep Sea"][
         "ASFIS Scientific Name"
     ].map(scientific_to_isscaap)
+
     # Ensure this stock is kept in final dataset even though uncertainty is high
     overview["Deep Sea"].loc[
         overview["Deep Sea"]["ASFIS Name"] == "Neon flying squid",
@@ -329,17 +335,20 @@ def main():
 
     # Helper function to make the shark location from the columns Ocean and Area
     def make_shark_loc(row):
-        ocean, area = row["Ocean"], row["FAO Area"]
+        ocean, area, area_number = row["Ocean"], row["FAO Area"], row["Area Number"]
+        
+        area_number = str(area_number)
+        area_number = area_number.replace(" & ", ", ")
 
-        if isinstance(area, float) and np.isnan(area):
-            return ocean
+        if (isinstance(area, float) and np.isnan(area)) or ocean in area:
+            if "All areas" in ocean:
+                return ocean
+            else:
+                return ocean + f" -  Area(s) {area_number}"
 
-        if ocean in area:
-            return area
+        return ocean + " " + area + f" -  Area(s) {area_number}"
 
-        return ocean + " " + area
-
-    overview["Sharks"]["Location"] = overview["Sharks"][["Ocean", "FAO Area"]].apply(
+    overview["Sharks"]["Location"] = overview["Sharks"][["Ocean", "FAO Area", "Area Number"]].apply(
         make_shark_loc, axis=1
     )
     # All Shark assessments are tier 1 and ISSCAAP Code 38
@@ -741,6 +750,25 @@ def main():
     assessed_stocks_mask = stock_assessments["Status"].isin(["U", "M", "O"])
     assessed_stocks = stock_assessments[assessed_stocks_mask]
 
+    # Create new dataframe with separate column for FAO major fishing area
+    # This maps the special group stocks to their corresponding FAO major fishing area
+    # Retrieve location to area map for special groups stocks
+    with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
+        location_to_area = json.load(file)
+
+    assessed_stocks_fao_area = assessed_stocks.copy()
+    assessed_stocks_fao_area["FAO Major Fishing Area(s)"] = assessed_stocks_fao_area[
+        ["Area", "Location"]
+    ].apply(assign_fao_area, args=(location_to_area,), axis=1)
+
+    # Reorder columns
+    cols_order = ["Area", "FAO Major Fishing Area(s)"] + [
+        col
+        for col in assessed_stocks_fao_area.columns
+        if col not in ["Area", "FAO Major Fishing Area(s)"]
+    ]
+    assessed_stocks_fao_area = assessed_stocks_fao_area[cols_order]
+
     print(f"Saving output files to {output_dir}")
     stock_assessments.to_excel(
         os.path.join(output_dir, "stock_assessments_w_unassessed.xlsx"), index=False
@@ -748,14 +776,19 @@ def main():
     assessed_stocks.to_excel(
         os.path.join(output_dir, "stock_assessments.xlsx"), index=False
     )
-    
+    assessed_stocks_fao_area.to_excel(
+        os.path.join(output_dir, "stock_assessments_w_fao_area.xlsx"), index=False
+    )
+
     # Save list of all species moved to special groups
     special_groups = ["Deep Sea", "Salmon", "Sharks", "Tuna"]
     special_groups_mask = assessed_stocks["Area"].isin(special_groups)
-    special_group_species = assessed_stocks[special_groups_mask][["ASFIS Scientific Name", "Area"]]
+    special_group_species = assessed_stocks[special_groups_mask][
+        ["ASFIS Scientific Name", "Area"]
+    ]
     special_group_species = special_group_species.drop_duplicates()
     special_group_species = special_group_species.rename(columns={"Area": "Group"})
-    
+
     special_group_species.to_excel(
         os.path.join(output_dir, "special_group_species.xlsx"), index=False
     )

@@ -754,6 +754,32 @@ def concatenate_data(overview, cols_to_sort=[]):
     return overview_df
 
 
+def assign_fao_area(row, location_to_area):
+    area = row["Area"]
+
+    if isinstance(area, int):
+        return area
+
+    if area == "Salmon":
+        return 67
+
+    loc = row["Location"]
+
+    if area == "48,58,88":
+        south_area = loc.split(".")[0]
+        if south_area.isdigit():
+            return int(south_area)
+
+    areas = location_to_area[area].get(loc, np.nan)
+
+    if not isinstance(areas, list):
+        return areas
+    elif isinstance(areas, list) and len(areas) == 0:
+        return areas[0]
+
+    return ", ".join([str(a) for a in areas])
+
+
 def validate_primary_key(df, primary_key=["Area", "ASFIS Scientific Name", "Location"]):
     """Validates the uniqueness and non-null values of a primary key in a DataFrame.
 
