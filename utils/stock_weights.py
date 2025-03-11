@@ -163,10 +163,12 @@ def merge_weights(
         merge.loc[merge["_merge"] == "both", "Weight 1"] = np.nan
 
     cols_to_drop = new_cols + ["_merge"]
+
     if clean_location:
         cols_to_drop.append("Location Match")
         primary_key.remove("Location Match")
         primary_key.append("Location")
+        cols_to_drop.append("Location_new")
 
     merge = merge.drop(columns=cols_to_drop)
 
