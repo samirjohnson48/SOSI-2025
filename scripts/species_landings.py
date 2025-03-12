@@ -27,6 +27,7 @@ import numpy as np
 import json
 from tqdm import tqdm
 
+
 from utils.species_landings import *
 from utils.stock_assessments import get_asfis_mappings
 
@@ -64,6 +65,9 @@ def main():
     # Compute species landings for all assessed stocks
     year_start, year_end = 1950, 2021
     years = list(range(year_start, year_end + 1))
+
+    for year in years:
+        species_landings[year] = pd.Series(dtype=object)
 
     print("Computing species landings...")
     tqdm.pandas()

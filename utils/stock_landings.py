@@ -4,6 +4,7 @@
 
 import pandas as pd
 import numpy as np
+import json
 
 
 def compute_num_stocks(stock_landings, group_key=["Area", "ASFIS Scientific Name"]):
@@ -18,12 +19,24 @@ def compute_landings(
 ):
     if row["Area"] == "Tuna":
         return row[species_landings]
-    elif row["Num Stocks"] == 1 and not pd.isna(row[species_landings]):
-        return row[species_landings]
+    elif row["Area"] == "Sharks":
+        if isinstance(row[weight], (int, float)):
+            return row[species_landings]
+        elif isinstance(row[weight], str):
+            # Dictionary saved as JSON string in pandas dataframe
+            weight_dict = json.loads(row[weight])
+            sl_dict = json.loads(row[species_landings])
+
+            shark_l = 0
+
+            for area, w in weight_dict.items():
+                shark_l += sl_dict.get(area, 0) * w
+
+            return shark_l
     elif not pd.isna(row[species_landings]) and not pd.isna(row[weight]):
         return row[species_landings] * row[weight]
-    # elif np.isnan(row[species_landings]) and not pd.isna(row["Weight 1"]):
-    #     return row["Weight 1"]
+    elif row["Num Stocks"] == 1 and not pd.isna(row[species_landings]):
+        return row[species_landings]
     return np.nan
 
 

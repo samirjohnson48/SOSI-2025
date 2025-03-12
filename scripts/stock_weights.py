@@ -112,11 +112,29 @@ def main():
         specify_area, args=(location_to_area,), axis=1
     )
 
+    # TRY TO NORMALIZE SHARKS WEIGHTS
+
+    sharks_mask = weights["Area"] == "Sharks"
+    weights_sharks = weights[sharks_mask].copy()
+    weights_no_sharks = weights[~sharks_mask].copy()
+
+    weights_sharks["Area Specific"] = weights_sharks["Area Specific"].apply(
+        lambda areas: [int(a) for a in areas.split(", ")]
+    )
+
+    weights_sharks = weights_sharks.explode("Area Specific")
+
+    weights_exp = (
+        pd.concat([weights_no_sharks, weights_sharks])
+        .sort_values(["Area", "ASFIS Scientific Name", "Location"])
+        .reset_index(drop=True)
+    )
+
     # Progress bar
     tqdm.pandas()
 
-    weights["Normalized Weight"] = (
-        weights.groupby(["Area Specific", "ASFIS Scientific Name"])[
+    weights_exp["Normalized Weight"] = (
+        weights_exp.groupby(["Area Specific", "ASFIS Scientific Name"])[
             ["Weight 1", "Weight 2"]
         ]
         .progress_apply(compute_weights)
@@ -125,15 +143,29 @@ def main():
 
     # Validate weight normalization
     validate_normalization(
-        weights, group_key=["Area Specific", "ASFIS Scientific Name"]
+        weights_exp, group_key=["Area Specific", "ASFIS Scientific Name"]
     )
 
-    weights = weights.drop(columns="Area Specific")
+    # weights = weights.drop(columns="Area Specific")
+
+    def aggregate_weight(group, area_col="Area Specific", nw_col="Normalized Weight"):
+        if len(group) == 1:
+            return group[nw_col].iloc[0]
+        else:
+            return json.dumps(dict(zip(group[area_col], group[nw_col])))
+
+    weights_final = (
+        weights_exp.groupby(["Area", "ASFIS Scientific Name", "Location"])[
+            ["Area Specific", "Normalized Weight"]
+        ]
+        .apply(aggregate_weight)
+        .reset_index(name="Normalized Weight")
+    )
 
     # Save assigned weights to output file
     file_path = os.path.join(output_dir, "stock_weights.xlsx")
     print(f"Saving stocks with weights to {file_path}")
-    weights.to_excel(file_path, index=False)
+    weights_final.to_excel(file_path, index=False)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ These functions are implemented in ./main/fishstat_landings.py
 
 import pandas as pd
 import numpy as np
+import json
 
 
 def format_fishstat(fishstat, code_to_scientific=[], year_start=1950, year_end=2022):
@@ -60,5 +61,22 @@ def compute_species_landings(
     if sum(sn_mask) == 0:
         # If no matching scientific names, return missing values
         return pd.Series([np.nan] * len(years), index=years)
+
+    # Return dictionary of Area to landings for sharks covering more than one FAO area
+    if row["Area"] == "Sharks":
+        if len(areas) == 1:
+            area_mask = fishstat["Area"] == areas[0]
+            return fishstat[area_mask & sn_mask][years].sum()
+        else:
+            cap_series = pd.Series(index=years, dtype=object)
+
+            for year in years:
+                cap_dict = {}
+                for area in areas:
+                    area_mask_shark = fishstat["Area"] == area
+                    cap_dict[area] = fishstat[area_mask_shark & sn_mask][year].sum()
+                cap_series[year] = json.dumps(cap_dict)
+
+            return cap_series
 
     return fishstat[area_mask & sn_mask][years].sum()

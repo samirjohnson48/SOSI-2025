@@ -4,6 +4,7 @@
 
 import pandas as pd
 import numpy as np
+import json
 from openpyxl import load_workbook
 from functools import reduce
 
@@ -274,7 +275,51 @@ def compute_appendix_landings(
     year_end=2021,
     last_decade_year=2010,
 ):
-    species_landings_dec = species_landings.copy()
+    # Convert Shark species landings from dictionary back to total number
+    # Exclude landings from sharks in FAO areas
+
+    sl_sharks_mask = species_landings["Area"] == "Sharks"
+    sl_sharks = species_landings[sl_sharks_mask].copy()
+    sl_no_sharks = species_landings[~sl_sharks_mask].copy()
+
+    sharks_list = sl_sharks["ASFIS Scientific Name"].unique()
+
+    area_sharks_mask = sl_no_sharks["ASFIS Scientific Name"].isin(sharks_list)
+    sl_area_sharks = sl_no_sharks[area_sharks_mask]
+    sl_area_sharks_set = set(
+        zip(sl_area_sharks["Area"], sl_area_sharks["ASFIS Scientific Name"])
+    )
+
+    def convert_shark_landings(row, years, sharks_set=sl_area_sharks_set):
+        sn = row["ASFIS Scientific Name"]
+
+        sl_tot_dict = {}
+
+        for year in years:
+            if isinstance(row[year], (int, float)):
+                sl_tot_dict[year] = row[year]
+            else:
+                sl_dict = json.loads(row[year])
+
+                sl_tot = sum(
+                    sl_dict[area]
+                    for area in sl_dict.keys()
+                    if (int(area), sn) not in sharks_set
+                )
+
+                sl_tot_dict[year] = sl_tot
+
+        return pd.Series(sl_tot_dict)
+
+    years = list(range(year_start, year_end + 1))
+
+    sl_sharks[years] = sl_sharks.apply(convert_shark_landings, args=(years,), axis=1)
+
+    species_landings_dec = (
+        pd.concat([sl_no_sharks, sl_sharks])
+        .reset_index(drop=True)
+        .sort_values(["Area", "ASFIS Scientific Name", "Location"])
+    )
 
     # Standardize the uncertainty
     species_landings_dec["Uncertainty"] = species_landings_dec["Uncertainty"].apply(
@@ -384,7 +429,7 @@ def compute_appendix_landings(
         ["ASFIS Scientific Name", "Area", "Location"]
     ].apply(most_active_countries, axis=1)
 
-    species_landings_dec = species_landings_dec.drop(columns=["Location"])
+    # species_landings_dec = species_landings_dec.drop(columns=["Location"])
 
     # Reorder columns
     columns_order = [
@@ -583,6 +628,26 @@ def compute_appendix_landings(
         cap = cap.drop(columns=["Alpha3_Code"])
 
         total_cap = cap[get_numeric_cols(cap.columns)].sum() / 1e3
+
+        # Take out shark landings from sharks reported in FAO areas
+        if area == "Sharks":
+            sl_sharks_mask_cap = species_landings_dec["ASFIS Scientific Name"].isin(
+                sharks_list
+            )
+            numeric_areas = [
+                area
+                for area in species_landings["Area"].unique()
+                if isinstance(area, int) or area == "48,58,88"
+            ]
+            numeric_areas_mask = species_landings_dec["Area"].isin(numeric_areas)
+
+            sl_sharks_cap = species_landings_dec[
+                sl_sharks_mask_cap & numeric_areas_mask
+            ]
+
+            total_cap -= sl_sharks_cap[get_numeric_cols(sl_sharks_cap.columns)].sum()
+
+            total_cap = total_cap.combine(total_area, max)
 
         if area in landings_to_add["Area"].unique():
             additional_landings = landings_to_add[landings_to_add["Area"] == area][
