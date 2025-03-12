@@ -41,7 +41,7 @@ def main():
     code_to_isscaap = dict(zip(asfis["Alpha3_Code"], asfis["ISSCAAP_Group_Code"]))
 
     fishstat = format_fishstat(fishstat, code_to_scientific)
-    fishstat["ISSCAAP Code"] = fishstat["Alpha3_Code"].map(code_to_scientific)
+    fishstat["ISSCAAP Code"] = fishstat["Alpha3_Code"].map(code_to_isscaap)
 
     # Remove all rows without Alpha 3 species code
     fishstat = fishstat.dropna(subset="Alpha3_Code")
