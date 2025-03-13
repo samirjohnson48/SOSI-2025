@@ -62,8 +62,8 @@ def compute_species_landings(
         # If no matching scientific names, return missing values
         return pd.Series([np.nan] * len(years), index=years)
 
-    # Return dictionary of Area to landings for sharks covering more than one FAO area
-    if row["Area"] == "Sharks":
+    # Return dictionary of Area to landings for sharks/deep sea covering more than one FAO area
+    if row["Area"] in ["Sharks", "Deep Sea"]:
         if len(areas) == 1:
             area_mask = fishstat["Area"] == areas[0]
             return fishstat[area_mask & sn_mask][years].sum()
@@ -73,8 +73,8 @@ def compute_species_landings(
             for year in years:
                 cap_dict = {}
                 for area in areas:
-                    area_mask_shark = fishstat["Area"] == area
-                    cap_dict[area] = fishstat[area_mask_shark & sn_mask][year].sum()
+                    area_mask_sg = fishstat["Area"] == area
+                    cap_dict[area] = fishstat[area_mask_sg & sn_mask][year].sum()
                 cap_series[year] = json.dumps(cap_dict)
 
             return cap_series

@@ -112,20 +112,66 @@ def main():
         specify_area, args=(location_to_area,), axis=1
     )
 
-    # TRY TO NORMALIZE SHARKS WEIGHTS
+    # Separate out Shark and Deep Sea stocks into their FAO Areas
+    # Then weights are normalized over these species groups to not double count landings
 
     sharks_mask = weights["Area"] == "Sharks"
+    ds_mask = weights["Area"] == "Deep Sea"
     weights_sharks = weights[sharks_mask].copy()
-    weights_no_sharks = weights[~sharks_mask].copy()
+    weights_ds = weights[ds_mask].copy()
+    weights_rest = weights[~(sharks_mask | ds_mask)].copy()
 
     weights_sharks["Area Specific"] = weights_sharks["Area Specific"].apply(
         lambda areas: [int(a) for a in areas.split(", ")]
     )
 
+    weights_ds["Area Specific"] = weights_ds["Area Specific"].apply(
+        lambda areas: [int(a) for a in areas.split(", ")]
+    )
+
     weights_sharks = weights_sharks.explode("Area Specific")
+    weights_ds = weights_ds.explode("Area Specific")
+
+    # Specify weights for Deep Sea stocks based on corresponding stock from Complete_data_weighting.xlsx
+    ds_sn_mask1 = weights_ds["ASFIS Scientific Name"] == "Pandalus borealis"
+    w_sn_mask1 = weights_21_27_67["ASFIS Scientific Name"] == "Pandalus borealis"
+    ds_loc_mask1 = weights_ds["Location"] == "Division 3LNO"
+    w_loc_mask1 = (weights_21_27_67["Location"] == "SFA 7") & (
+        weights_21_27_67["Area"] == 21
+    )
+    weights_ds.loc[ds_sn_mask1 & ds_loc_mask1, "Weight 2"] = weights_21_27_67.loc[
+        w_sn_mask1 & w_loc_mask1, "Weight 2"
+    ].values
+
+    ds_sn_mask2 = weights_ds["ASFIS Scientific Name"] == "Chionoecetes opilio"
+    w_sn_mask2 = weights_21_27_67["ASFIS Scientific Name"] == "Chionoecetes opilio"
+    ds_loc_mask2 = weights_ds["Location"] == "Grand Bank 3LNO"
+    w_loc_mask2 = (
+        weights_21_27_67["Location"]
+        == "Newfoundland and Labrador (Divisions 2HJ3KLNOP4R)"
+    ) & (weights_21_27_67["Area"] == 21)
+    weights_ds.loc[ds_sn_mask2 & ds_loc_mask2, "Weight 2"] = (
+        weights_21_27_67.loc[w_sn_mask2 & w_loc_mask2, "Weight 2"].values / 2
+    )
+
+    # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2022/scr22-013.pdf -- Table 1, Total (catch) in 2021
+    ds_sn_mask3 = (
+        weights_ds["ASFIS Scientific Name"] == "Sebastes mentella, Sebastes fasciatus"
+    )
+    ds_loc_mask3 = weights_ds["Location"] == "Divisions 3LN Grand Bank"
+    weights_ds.loc[ds_sn_mask3 & ds_loc_mask3, "Weight 2"] = 10_172
+
+    # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2022/scr22-044.pdf -- Table 1, Total (catch) in 2021
+    ds_loc_mask4 = weights_ds["Location"] == "Divisions 3O Grand Bank"
+    weights_ds.loc[ds_sn_mask3 & ds_loc_mask4, "Weight 2"] = 5_577
+
+    # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2021/scr21-020.pdf -- Table B4, Landings in 2020
+    ds_sn_mask4 = weights_ds["ASFIS Scientific Name"] == "Hippoglossoides platessoides"
+    ds_loc_mask5 = weights_ds["Location"] == "3LNO"
+    weights_ds.loc[ds_sn_mask4 & ds_loc_mask5, "Weight 2"] = 1_175
 
     weights_exp = (
-        pd.concat([weights_no_sharks, weights_sharks])
+        pd.concat([weights_rest, weights_sharks, weights_ds])
         .sort_values(["Area", "ASFIS Scientific Name", "Location"])
         .reset_index(drop=True)
     )

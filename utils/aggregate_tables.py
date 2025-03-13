@@ -321,6 +321,10 @@ def compute_appendix_landings(
         .sort_values(["Area", "ASFIS Scientific Name", "Location"])
     )
 
+    # Exclude Deep Sea since we cannot calculate total Deep Sea landings from fishstat
+    ds_mask = species_landings_dec["Area"] == "Deep Sea"
+    species_landings_dec = species_landings_dec[~ds_mask]
+
     # Standardize the uncertainty
     species_landings_dec["Uncertainty"] = species_landings_dec["Uncertainty"].apply(
         lambda x: (
@@ -480,10 +484,6 @@ def compute_appendix_landings(
     summaries_w_year = {}
 
     for area in species_landings_dec["Area"].unique():
-        # Cannot calculate total landings for Deep Sea so we skip this category
-        if area == "Deep Sea":
-            continue
-
         # Total assessed landings in area
         area_landings = species_landings_dec[species_landings_dec["Area"] == area].drop(
             columns="Area"
@@ -699,45 +699,168 @@ def compute_appendix_landings(
     return summaries_w_dec, summaries_w_year
 
 
+def compute_sg_area_landings(
+    stock_weights, species_landings, special_group, location_to_area
+):
+    sl_sg_mask = species_landings["Area"] == special_group
+    sl = species_landings[sl_sg_mask][
+        ["ASFIS Scientific Name", "Location", "Status", "Tier", 2021]
+    ].copy()
+
+    sw_sg_mask = stock_weights["Area"] == special_group
+    sw = stock_weights[sw_sg_mask][
+        ["ASFIS Scientific Name", "Location", "Normalized Weight"]
+    ].copy()
+
+    sg_landings = pd.merge(sl, sw, on=["ASFIS Scientific Name", "Location"])
+
+    def compute_sg_landings(row):
+        if isinstance(row["Normalized Weight"], (int, float)) and isinstance(
+            row[2021], (int, float)
+        ):
+            areas = location_to_area[special_group][row["Location"]]
+
+            landings = [row["Normalized Weight"] * row[2021]]
+
+            return pd.Series([areas, landings], index=["Area", "Stock Landings 2021"])
+
+        w_dict = json.loads(row["Normalized Weight"])
+        l_dict = json.loads(row[2021])
+
+        areas, landings = [], []
+
+        for area, area_landings in l_dict.items():
+            weight = w_dict.get(area, 0)
+
+            l = area_landings * weight
+
+            areas.append(int(area))
+            landings.append(l)
+
+        return pd.Series([areas, landings], index=["Area", "Stock Landings 2021"])
+
+    sg_landings[["Area", "Stock Landings 2021"]] = sg_landings.apply(
+        compute_sg_landings, axis=1
+    )
+
+    sg_landings = sg_landings.explode(["Area", "Stock Landings 2021"])
+
+    sg_landings = sg_landings[
+        [
+            "Area",
+            "ASFIS Scientific Name",
+            "Location",
+            "Status",
+            "Tier",
+            "Stock Landings 2021",
+        ]
+    ]
+
+    mask_485888 = sg_landings["Area"].isin([48, 58, 88])
+
+    sg_landings.loc[mask_485888, "Area"] = "48,58,88"
+
+    return sg_landings
+
+
 def compute_weighted_percentages(
     stock_landings,
     fishstat=None,
     key="Area",
-    tuna_location_to_area={},
+    location_to_area={},
+    add_salmon=False,
+    shark_area_landings=pd.DataFrame(),
+    ds_area_landings=pd.DataFrame(),
     year=2021,
     landings_key="Stock Landings 2021",
 ):
     data = stock_landings.copy()
 
-    if tuna_location_to_area and key == "Area":
-        # Add the Tuna back into the areas from which they came
-        # One tuna assessment corresponds to multiple
-        # assessments added back into the area with the same status
-        # as original assessment and landing specific to that area
+    def add_special_group_landings(data, special_group, lta, fs=fishstat):
+        df = data.copy()
+
         sn = "ASFIS Scientific Name"
-        tuna_in_areas = pd.DataFrame()
-        for idx, row in data[data["Area"] == "Tuna"].iterrows():
-            areas = tuna_location_to_area[row["Location"]]
+        sg_in_areas = pd.DataFrame()
+        for idx, row in data[data["Area"] == special_group].iterrows():
+            areas = lta[row["Location"]]
+
+            if ", " in row[sn]:
+                sn_mask = fs[sn].isin(row[sn].split(", "))
+            else:
+                sn_mask = fs[sn] == row[sn]
 
             for area in areas:
-                tuna_capture = fishstat[
-                    (fishstat["Area"] == area) & (fishstat[sn] == row[sn])
-                ][year].sum()
-                if tuna_capture > 0:
-                    tuna_in_area = pd.DataFrame(
+                sg_capture = fs[(fs["Area"] == area) & sn_mask][year].sum()
+                if sg_capture > 0:
+                    sg_in_area = pd.DataFrame(
                         {
                             "Area": area,
                             "ASFIS Scientific Name": row[sn],
                             "Status": row["Status"],
-                            landings_key: tuna_capture,
+                            landings_key: sg_capture,
                         },
-                        index=[len(tuna_in_areas)],
+                        index=[len(sg_in_areas)],
                     )
-                    tuna_in_areas = pd.concat([tuna_in_areas, tuna_in_area])
+                    sg_in_areas = pd.concat([sg_in_areas, sg_in_area])
+
+        sg_in_areas = sg_in_areas.drop_duplicates(
+            subset=["Area", "ASFIS Scientific Name", "Status"]
+        )
 
         # Add the area specific tuna rows, and remove the Tuna category
-        data = data[~(data["Area"] == "Tuna")]
-        data = pd.concat([data, tuna_in_areas]).reset_index(drop=True)
+        df = df[~(df["Area"] == special_group)]
+        df = pd.concat([df, sg_in_areas]).reset_index(drop=True)
+
+        return df
+
+    for special_group, lta in location_to_area.items():
+        # Add the special group stocks back into the areas from which they came
+        # One tuna assessment corresponds to multiple
+        # assessments added back into the area with the same status
+        # as original assessment and landing specific to that area
+        data = add_special_group_landings(data, special_group, lta, fishstat)
+
+    if add_salmon:
+        salmon_mask = data["Area"] == "Salmon"
+        data.loc[salmon_mask, "Area"] = 67
+
+    if not shark_area_landings.empty:
+        sharks_mask = data["Area"] == "Sharks"
+        data = data[~sharks_mask]
+
+        data = pd.concat([data, shark_area_landings])
+
+    if not ds_area_landings.empty:
+        ds_mask = data["Area"] == "Deep Sea"
+        data = data[~ds_mask]
+
+        data = pd.concat([data, ds_area_landings])
+
+    # if tuna_location_to_area and key == "Area":
+    #     sn = "ASFIS Scientific Name"
+    #     tuna_in_areas = pd.DataFrame()
+    #     for idx, row in data[data["Area"] == "Tuna"].iterrows():
+    #         areas = tuna_location_to_area[row["Location"]]
+
+    #         for area in areas:
+    #             tuna_capture = fishstat[
+    #                 (fishstat["Area"] == area) & (fishstat[sn] == row[sn])
+    #             ][year].sum()
+    #             if tuna_capture > 0:
+    #                 tuna_in_area = pd.DataFrame(
+    #                     {
+    #                         "Area": area,
+    #                         "ASFIS Scientific Name": row[sn],
+    #                         "Status": row["Status"],
+    #                         landings_key: tuna_capture,
+    #                     },
+    #                     index=[len(tuna_in_areas)],
+    #                 )
+    #                 tuna_in_areas = pd.concat([tuna_in_areas, tuna_in_area])
+
+    #     # Add the area specific tuna rows, and remove the Tuna category
+    #     data = data[~(data["Area"] == "Tuna")]
+    #     data = pd.concat([data, tuna_in_areas]).reset_index(drop=True)
 
     # Group by key and Status to aggregate data
     group = data.groupby([key, "Status"])[landings_key].sum().unstack(fill_value=0)
@@ -799,42 +922,67 @@ def compute_weighted_percentages(
 
     result.index.name = key
 
-    # Returns the tunas added back into areas if applicable
-    if tuna_location_to_area and key == "Area":
-        return result, tuna_in_areas
-
     return result
 
 
 def get_weighted_percentages_and_total_landings(
-    weighted_percentages, appendix_landings, tuna_landings=pd.DataFrame(), year=2021
+    weighted_percentages,
+    appendix_landings={},
+    tuna_landings=pd.DataFrame(),
+    fishstat=pd.DataFrame(),
+    isscaap_to_remove=[],
+    areas=[],
+    year=2021,
+    special_groups=True,
 ):
     total_landings = {"Global": 0}
 
-    for area, df in appendix_landings.items():
-        # Check if tunas have been taken out as separate category
-        if not tuna_landings.empty and area == "Tuna":
-            continue
+    # If we are including special groups, we use appendix landings
+    if appendix_landings:
+        for area, df in appendix_landings.items():
+            # Check if tunas have been taken out as separate category
+            if not tuna_landings.empty and area == "Tuna":
+                continue
 
-        if isinstance(area, str) and area.isdigit():
-            area = int(area)
+            if isinstance(area, str) and area.isdigit():
+                area = int(area)
 
-        tot = (
-            df.loc[df["ASFIS Name"] == "Total marine capture", 2021].values[0] / 1e3
-        )  # Convert to Mt
+            tot = (
+                df.loc[df["ASFIS Name"] == "Total marine capture", 2021].values[0] / 1e3
+            )  # Convert to Mt
 
-        if not tuna_landings.empty:
-            tl_area_mask = (
-                tuna_landings["Area"].isin([48, 58, 88])
-                if area == "48,58,88"
-                else tuna_landings["Area"] == area
-            )
-            tl = tuna_landings.loc[tl_area_mask, year].values / 1e6  # Convert to Mt
-            if tl:
-                tot += tl
+            if not tuna_landings.empty:
+                tl_area_mask = (
+                    tuna_landings["Area"].isin([48, 58, 88])
+                    if area == "48,58,88"
+                    else tuna_landings["Area"] == area
+                )
+                tl = tuna_landings.loc[tl_area_mask, year].values / 1e6  # Convert to Mt
+                if tl:
+                    tot += tl
 
-        total_landings[area] = tot
-        total_landings["Global"] += tot
+            total_landings[area] = tot
+            total_landings["Global"] += tot
+    elif (
+        not fishstat.empty
+    ):  # Otherwise use fishstat data to get totals for area without special groups
+        isscaap_mask = ~fishstat["ISSCAAP Code"].isin(isscaap_to_remove)
+        fs = fishstat[isscaap_mask].copy()
+
+        areas_mask = fs["Area"].isin(areas)
+        fs = fs[areas_mask]
+
+        mask_485888 = fs["Area"].isin([48, 58, 88])
+        fs["Area"] = fs["Area"].astype(object)
+        fs.loc[mask_485888, "Area"] = "48,58,88"
+
+        fs_grouped = fs.groupby("Area")[2021]
+
+        for area, group in fs_grouped:
+            tot = group.sum() / 1e6  # Convert to Mt
+
+            total_landings[area] = tot
+            total_landings["Global"] += tot
 
     total_landings_df = pd.DataFrame(total_landings, index=[0]).T
     total_landings_df.columns = pd.MultiIndex.from_tuples([("", "Total Landings (Mt)")])
@@ -860,6 +1008,11 @@ def get_weighted_percentages_and_total_landings(
     result = pd.merge(
         w, total_landings_df, left_index=True, right_index=True, how="left"
     )
+
+    if not special_groups:
+        sg_mask = result.index.isin(["Deep Sea", "Salmon", "Sharks", "Tuna"])
+
+        result = result[~sg_mask]
 
     result = result[
         [("", "Total Landings (Mt)"), ("", "Total Assessed Landings (Mt)")]
@@ -1006,7 +1159,8 @@ def remove_isscaap_fishstat(
     lta = lta.drop(columns="Location")
     lta = lta.rename(columns={landings_key: year})
 
-    fs = pd.concat([fs, lta])
+    if not lta.empty:
+        fs = pd.concat([fs, lta])
 
     return fs
 
@@ -1023,6 +1177,8 @@ def compute_percent_coverage(
     extra_stocks_map={},
     year=2021,
     location_to_area={},
+    shark_area_landings=pd.DataFrame(),
+    ds_area_landings=pd.DataFrame(),
 ):
     if tier:
         if tier == "Missing":
@@ -1063,6 +1219,9 @@ def compute_percent_coverage(
 
                     extra_stocks_added += list(extra_stocks)
 
+        if area == 71:
+            print(tier, extra_stocks_total)
+
         # Check if tuna landings need to be added back into area
         tuna_total = 0
         for idx, row in sl[sl["Area"] == "Tuna"].iterrows():
@@ -1084,31 +1243,51 @@ def compute_percent_coverage(
                         coverage += tuna_coverage
                         tuna_total += tuna_coverage
 
+        # Add Sharks and Deep Sea landings to FAO Area from which they are reported
+        if not shark_area_landings.empty:
+            if area == "48,58,88":
+                shark_area_mask = shark_area_landings["Area"].isin([48, 58, 88])
+            else:
+                shark_area_mask = shark_area_landings["Area"] == area
+
+            if tier:
+                if tier == "Missing":
+                    tier_mask = shark_area_landings["Tier"].isna()
+                else:
+                    tier_mask = shark_area_landings["Tier"] == tier
+            else:
+                tier_mask = pd.Series(True, index=shark_area_landings.index)
+
+            shark_landings = shark_area_landings[shark_area_mask & tier_mask][
+                "Stock Landings 2021"
+            ].sum()
+
+            coverage += shark_landings
+
+        if not ds_area_landings.empty:
+            if area == "48,58,88":
+                ds_area_mask = ds_area_landings["Area"].isin([48, 58, 88])
+            else:
+                ds_area_mask = ds_area_landings["Area"] == area
+
+            if tier:
+                if tier == "Missing":
+                    tier_mask = ds_area_landings["Tier"].isna()
+                else:
+                    tier_mask = ds_area_landings["Tier"] == tier
+            else:
+                tier_mask = pd.Series(True, index=ds_area_landings.index)
+
+            ds_landings = ds_area_landings[ds_area_mask & tier_mask][
+                "Stock Landings 2021"
+            ].sum()
+
+            coverage += ds_landings
+
         # Add salmon to Area 67
         if area == 67 and "Salmon" in sl["Area"].unique():
             salmon_coverage = sl[(sl["Area"] == "Salmon")][landings_key].sum()
             coverage += salmon_coverage
-
-        # Check if sharks need to be added to area
-        sharks_total = 0
-        for idx, row in sl[sl["Area"] == "Sharks"].iterrows():
-            # Make sure not to double count stocks
-            if row[sn_key] not in extra_stocks_added:
-                sharks_areas = location_to_area["Sharks"][row["Location"]]
-
-                sharks_mask = fs["ASFIS Scientific Name"] == row[sn_key]
-
-                if area in sharks_areas:
-                    sharks_coverage = fs[sharks_mask & fs_area_mask][year].sum()
-                    coverage += sharks_coverage
-                    sharks_total += sharks_coverage
-                elif area == "48,58,88":  # Check for sharks in areas 48,58,88
-                    sharks_s_areas = [a for a in [48, 58, 88] if a in sharks_areas]
-                    if sharks_s_areas:
-                        sharks_s_mask = fs["Area"].isin(sharks_s_areas)
-                        sharks_coverage = fs[tuna_mask & sharks_s_mask][year].sum()
-                        coverage += sharks_coverage
-                        sharks_total += sharks_coverage
 
         # Calculate area's total landings
         total_area_mask = (
@@ -1144,6 +1323,8 @@ def compute_percent_coverage_tiers(
     isscaap_to_remove,
     extra_stocks_map={},
     location_to_area={},
+    shark_area_landings=pd.DataFrame(),
+    ds_area_landings=pd.DataFrame(),
 ):
     tiers = [1, 2, 3, "Missing"]
     pc_tiers = []
@@ -1156,6 +1337,8 @@ def compute_percent_coverage_tiers(
             tier=tier,
             extra_stocks_map=extra_stocks_map,
             location_to_area=location_to_area,
+            shark_area_landings=shark_area_landings,
+            ds_area_landings=ds_area_landings,
         )
         rename_col = f"Tier {tier}" if isinstance(tier, int) else "No Tier"
         pc_tier = pc_tier.rename(columns={"Coverage (%) Update": rename_col})
