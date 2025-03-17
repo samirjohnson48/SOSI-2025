@@ -268,8 +268,9 @@ def main():
     aquaculture = format_fishstat(aquaculture)
     aquaculture = aquaculture.rename(
         columns={
-            "ASFIS species (Name)": "ASFIS Scientific Name",
+            "ASFIS species (Name)": "ASFIS Name",
             "ASFIS species (Code)": "ISSCAAP Code",
+            "ASFIS species (Scientific name)": "ASFIS Scientific Name"
         }
     )
     aquaculture = aquaculture.drop(columns=2022)
@@ -299,7 +300,7 @@ def main():
     # and later the percent coverage calculations as well.
     # (unless they appear in assessment, then they are added back in to total area landings)
     isscaap_to_remove = [61, 62, 63, 64, 71, 72, 73, 74, 81, 82, 83, 91, 92, 93, 94]
-
+    
     # Compute appendix landings
     appendix_decs, appendix_years = compute_appendix_landings(
         species_landings,
@@ -311,7 +312,11 @@ def main():
         location_to_area,
         iso3_to_name,
     )
-
+    
+    cols = []
+    for tier in [1,2,3]:
+        cols += [f"Tier {tier} Status", f"Tier {tier} Uncertainty"]
+    
     # Save appendix landings files
     # By decade
     appendix_decs_fp = os.path.join(output_dir, "appendix_landings_decades.xlsx")
@@ -350,43 +355,6 @@ def main():
     # Take out seals from stock landing aggregations since they are reported by number
     seals_mask = stock_landings["ISSCAAP Code"] == 63
     stock_landings = stock_landings[~seals_mask]
-
-    # Compute percent coverage for updated assessment
-    # Add unassessed stocks to Area 71 for coverage
-    area71_extras = pd.read_excel(
-        os.path.join(input_dir, "updated_assessment_overview.xlsx")
-    )
-    area71_extras = area71_extras.rename(
-        columns={
-            "More appropriate ASFIS Scientific Name": "Check",
-            "Scientific name ASFIS": "ASFIS Scientific Name",
-        }
-    )
-    # Take out tunas which are in Tuna category to not double count
-    tuna_mask = stock_assessments["Area"] == "Tuna"
-    tuna_df = stock_assessments[tuna_mask][["ASFIS Scientific Name", "Location"]].copy()
-    tuna_df["Areas"] = tuna_df["Location"].map(location_to_area["Tuna"])
-    tuna_71_mask = tuna_df["Areas"].apply(lambda x: 71 in x)
-    tuna_71_list = tuna_df[tuna_71_mask]["ASFIS Scientific Name"].unique()
-
-    area71_extras_mask = (area71_extras["Check"] == "to ignore") & ~(area71_extras["ASFIS Scientific Name"].isin(tuna_71_list))
-    area71_extras = area71_extras[area71_extras_mask]
-
-    area71_tier1_mask = area71_extras["Tier"] == 1
-    area71_no_tier_mask = area71_extras["Tier"].isna()
-
-    extra_stocks_map = {
-        "Update": {
-            71: {
-                1: area71_extras[area71_tier1_mask][
-                    "ASFIS Scientific Name"
-                ].values,
-                "Missing": area71_extras[area71_no_tier_mask][
-                    "ASFIS Scientific Name"
-                ].values,
-            }
-        }
-    }
     
     # Define areas for percent coverage reporting
     areas = [
@@ -409,7 +377,6 @@ def main():
         isscaap_to_remove,
         assessment="Update",
         location_to_area=location_to_area,
-        extra_stocks_map=extra_stocks_map,
         shark_area_landings=shark_area_landings,
         ds_area_landings=ds_area_landings
     )
@@ -420,7 +387,6 @@ def main():
         fishstat,
         areas,
         isscaap_to_remove,
-        extra_stocks_map=extra_stocks_map,
         location_to_area=location_to_area,
         shark_area_landings=shark_area_landings,
         ds_area_landings=ds_area_landings
@@ -547,6 +513,7 @@ def main():
 
     # Get same but w/o tunas as separate area
     # Compute tuna landings to add back into total landings for each area
+    tuna_mask = stock_assessments["Area"] == "Tuna"
     tuna_list = stock_assessments[tuna_mask]["ASFIS Scientific Name"].unique()
     fs_tuna_mask = fishstat["ASFIS Scientific Name"].isin(tuna_list)
     fs_tuna = fishstat[fs_tuna_mask].groupby("Area")[2021].sum().reset_index()
