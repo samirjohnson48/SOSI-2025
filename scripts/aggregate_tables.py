@@ -368,8 +368,6 @@ def main():
     
     shark_area_landings = compute_sg_area_landings(stock_weights, species_landings, "Sharks", location_to_area)
     
-    ds_area_landings = compute_sg_area_landings(stock_weights, species_landings, "Deep Sea", location_to_area) 
-
     pc = compute_percent_coverage(
         stock_landings,
         fishstat,
@@ -378,7 +376,6 @@ def main():
         assessment="Update",
         location_to_area=location_to_area,
         shark_area_landings=shark_area_landings,
-        ds_area_landings=ds_area_landings
     )
 
     # Compute percent coverage across tiers
@@ -389,7 +386,6 @@ def main():
         isscaap_to_remove,
         location_to_area=location_to_area,
         shark_area_landings=shark_area_landings,
-        ds_area_landings=ds_area_landings
     )
     # Retrieve SOFIA with landings
     sofia_landings = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
@@ -447,7 +443,6 @@ def main():
         location_to_area={"Tuna": location_to_area["Tuna"]},
         add_salmon=True,
         shark_area_landings=shark_area_landings,
-        ds_area_landings=ds_area_landings
     )
     
     # Compute weighted percentages for SOFIA

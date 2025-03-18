@@ -330,9 +330,9 @@ def compute_appendix_landings(
     def aggregate_status_by_tier(group, status_vals=["U", "M", "O"]):
         tier_data = []
         for tier in [1, 2, 3]:
-            tier_group = group[group['Tier'] == tier]
-            status_counts = tier_group['Status'].value_counts().to_dict()
-            row = {'Tier': f'Tier {tier}'}
+            tier_group = group[group["Tier"] == tier]
+            status_counts = tier_group["Status"].value_counts().to_dict()
+            row = {"Tier": f"Tier {tier}"}
             for status in status_vals:
                 row[status] = status_counts.get(status, np.nan)
             tier_data.append(row)
@@ -359,7 +359,7 @@ def compute_appendix_landings(
         f"{col[0]}_{col[1]}" if col[1] and isinstance(col[0], int) else col[0]
         for col in aggregated_species.columns
     ]
-    
+
     # Retrieve the most activate countries for each species for the given area(s)
     def most_active_countries(row, country_key="ISO3", year=2021):
         species, area = row["ASFIS Scientific Name"], row["Area"]
@@ -379,13 +379,13 @@ def compute_appendix_landings(
             area_list = []
             for loc in locs:
                 area_list += area_map.get(loc, [])
-                
+
         if ", " in species:
             species_list = species.split(", ")
             species_mask = fishstat["ASFIS Scientific Name"].isin(species_list)
         else:
             species_mask = fishstat["ASFIS Scientific Name"] == species
-            
+
         area_mask = fishstat["Area"].isin(area_list)
         cap = fishstat[species_mask & area_mask][[country_key, year]]
 
@@ -399,9 +399,9 @@ def compute_appendix_landings(
         cap_countries["Country"] = cap_countries[country_key].map(iso3_to_name)
 
         return ", ".join(cap_countries["Country"].values[:5])
-    
+
     tqdm.pandas(desc="Retrieving Most Active Countries in 2021")
-    
+
     aggregated_species["Most Active Countries in 2021"] = aggregated_species[
         ["ASFIS Scientific Name", "Area", "Location"]
     ].progress_apply(most_active_countries, axis=1)
@@ -434,11 +434,11 @@ def compute_appendix_landings(
 
     # Create the decade columns for the appendix sheet
     def create_decade_cols(
-        data, 
-        year_start=year_start, 
-        year_end=year_end, 
-        last_decade_year=last_decade_year
-        ):
+        data,
+        year_start=year_start,
+        year_end=year_end,
+        last_decade_year=last_decade_year,
+    ):
         d = data.copy()
         for start in range(year_start, last_decade_year + 1, 10):
             end = start + 9
@@ -446,22 +446,28 @@ def compute_appendix_landings(
         return d
 
     species_landings_dec = create_decade_cols(species_landings_dec)
-    
+
     # Remove duplicate values in columns not in Tier, U, M, O
     def manually_group_df(df, check_col, group_cols):
         result = df.copy()
         for i in range(len(df) - 1):
-            if df.loc[i, check_col] == df.loc[i+1, check_col]:
-                result.loc[i+1, group_cols] = np.nan
-                
+            if df.loc[i, check_col] == df.loc[i + 1, check_col]:
+                result.loc[i + 1, group_cols] = np.nan
+
         return result
-    
+
     check_col = "ASFIS Scientific Name"
     tier_cols = ["Tier", "U", "M", "O"]
-    group_cols = [col for col in species_landings_dec if col not in tier_cols + ["Area", "ISSCAAP Code"]]
-    
-    species_landings_dec = manually_group_df(species_landings_dec, check_col, group_cols)   
-    
+    group_cols = [
+        col
+        for col in species_landings_dec
+        if col not in tier_cols + ["Area", "ISSCAAP Code"]
+    ]
+
+    species_landings_dec = manually_group_df(
+        species_landings_dec, check_col, group_cols
+    )
+
     # Reorder columns
     columns_order = [
         "Area",
@@ -510,18 +516,16 @@ def compute_appendix_landings(
     # Data with individual years
     summaries_w_year = {}
 
-    for area in tqdm(species_landings_dec["Area"].unique(), desc="Creating Appendix Sheets"):
+    for area in tqdm(
+        species_landings_dec["Area"].unique(), desc="Creating Appendix Sheets"
+    ):
         # Total assessed landings in area
         area_landings = species_landings_dec[species_landings_dec["Area"] == area].drop(
             columns="Area"
         )
 
         # Create total rows for each ISSCAAP group
-        isscaap_total = (
-            area_landings.groupby("ISSCAAP Code")
-            .sum()
-            .reset_index()
-        )
+        isscaap_total = area_landings.groupby("ISSCAAP Code").sum().reset_index()
         isscaap_total["ASFIS Name"] = isscaap_total["ISSCAAP Code"].apply(
             lambda x: (
                 str(int(x)) + f" - {isscaap_code_to_name.get(x, " ")}"
@@ -690,7 +694,7 @@ def compute_appendix_landings(
         total_aqua["ASFIS Name"] = "Total aquaculture"
         total_production = total_production.to_frame().T
         total_production["ASFIS Name"] = "Total production"
-        
+
         area_summary = pd.concat(
             [
                 isscaap_grouped,
@@ -701,10 +705,12 @@ def compute_appendix_landings(
                 total_production,
             ]
         ).reset_index(drop=True)
-        
+
         def reverse_forward_fill(df, column_name):
             df_modified = df.copy()
-            groups = (df_modified[column_name] != df_modified[column_name].shift()).cumsum()
+            groups = (
+                df_modified[column_name] != df_modified[column_name].shift()
+            ).cumsum()
 
             def transform_group(group):
                 first_value = group[column_name].iloc[0]
@@ -714,9 +720,9 @@ def compute_appendix_landings(
             df_modified = df_modified.groupby(groups).apply(transform_group)
 
             return df_modified.reset_index(drop=True)
-        
+
         area_summary = reverse_forward_fill(area_summary, "ISSCAAP Code")
-        
+
         area_summary_dec = area_summary.drop(
             columns=list(range(year_start, last_decade_year + 10))
         )
@@ -726,10 +732,10 @@ def compute_appendix_landings(
             for start in range(year_start, last_decade_year + 1, 10)
         ]
         area_summary_years = area_summary.drop(columns=dec_cols)
-        
+
         summaries_w_dec[area] = area_summary_dec
         summaries_w_year[area] = area_summary_years
-        
+
         if area == 21:
             area_summary_dec.to_clipboard()
 
@@ -807,7 +813,6 @@ def compute_weighted_percentages(
     location_to_area={},
     add_salmon=False,
     shark_area_landings=pd.DataFrame(),
-    ds_area_landings=pd.DataFrame(),
     year=2021,
     landings_key="Stock Landings 2021",
 ):
@@ -855,7 +860,8 @@ def compute_weighted_percentages(
         # One tuna assessment corresponds to multiple
         # assessments added back into the area with the same status
         # as original assessment and landing specific to that area
-        data = add_special_group_landings(data, special_group, lta, fishstat)
+        if special_group != "Deep Sea":
+            data = add_special_group_landings(data, special_group, lta, fishstat)
 
     if add_salmon:
         salmon_mask = data["Area"] == "Salmon"
@@ -866,38 +872,6 @@ def compute_weighted_percentages(
         data = data[~sharks_mask]
 
         data = pd.concat([data, shark_area_landings])
-
-    if not ds_area_landings.empty:
-        ds_mask = data["Area"] == "Deep Sea"
-        data = data[~ds_mask]
-
-        data = pd.concat([data, ds_area_landings])
-
-    # if tuna_location_to_area and key == "Area":
-    #     sn = "ASFIS Scientific Name"
-    #     tuna_in_areas = pd.DataFrame()
-    #     for idx, row in data[data["Area"] == "Tuna"].iterrows():
-    #         areas = tuna_location_to_area[row["Location"]]
-
-    #         for area in areas:
-    #             tuna_capture = fishstat[
-    #                 (fishstat["Area"] == area) & (fishstat[sn] == row[sn])
-    #             ][year].sum()
-    #             if tuna_capture > 0:
-    #                 tuna_in_area = pd.DataFrame(
-    #                     {
-    #                         "Area": area,
-    #                         "ASFIS Scientific Name": row[sn],
-    #                         "Status": row["Status"],
-    #                         landings_key: tuna_capture,
-    #                     },
-    #                     index=[len(tuna_in_areas)],
-    #                 )
-    #                 tuna_in_areas = pd.concat([tuna_in_areas, tuna_in_area])
-
-    #     # Add the area specific tuna rows, and remove the Tuna category
-    #     data = data[~(data["Area"] == "Tuna")]
-    #     data = pd.concat([data, tuna_in_areas]).reset_index(drop=True)
 
     # Group by key and Status to aggregate data
     group = data.groupby([key, "Status"])[landings_key].sum().unstack(fill_value=0)
@@ -1215,7 +1189,6 @@ def compute_percent_coverage(
     year=2021,
     location_to_area={},
     shark_area_landings=pd.DataFrame(),
-    ds_area_landings=pd.DataFrame(),
 ):
     if tier:
         if tier == "Missing":
@@ -1298,26 +1271,6 @@ def compute_percent_coverage(
 
             coverage += shark_landings
 
-        if not ds_area_landings.empty:
-            if area == "48,58,88":
-                ds_area_mask = ds_area_landings["Area"].isin([48, 58, 88])
-            else:
-                ds_area_mask = ds_area_landings["Area"] == area
-
-            if tier:
-                if tier == "Missing":
-                    tier_mask = ds_area_landings["Tier"].isna()
-                else:
-                    tier_mask = ds_area_landings["Tier"] == tier
-            else:
-                tier_mask = pd.Series(True, index=ds_area_landings.index)
-
-            ds_landings = ds_area_landings[ds_area_mask & tier_mask][
-                "Stock Landings 2021"
-            ].sum()
-
-            coverage += ds_landings
-
         # Add salmon to Area 67
         if area == 67 and "Salmon" in sl["Area"].unique():
             salmon_coverage = sl[(sl["Area"] == "Salmon")][landings_key].sum()
@@ -1358,9 +1311,8 @@ def compute_percent_coverage_tiers(
     extra_stocks_map={},
     location_to_area={},
     shark_area_landings=pd.DataFrame(),
-    ds_area_landings=pd.DataFrame(),
 ):
-    tiers = [1, 2, 3, "Missing"]
+    tiers = [1, 2, 3]
     pc_tiers = []
     for tier in tiers:
         pc_tier = compute_percent_coverage(
@@ -1372,20 +1324,14 @@ def compute_percent_coverage_tiers(
             extra_stocks_map=extra_stocks_map,
             location_to_area=location_to_area,
             shark_area_landings=shark_area_landings,
-            ds_area_landings=ds_area_landings,
         )
-        rename_col = f"Tier {tier}" if isinstance(tier, int) else "No Tier"
+        rename_col = f"Tier {tier}"
         pc_tier = pc_tier.rename(columns={"Coverage (%) Update": rename_col})
         pc_tiers.append(pc_tier)
 
     pc_update = reduce(lambda left, right: pd.merge(left, right, on="Area"), pc_tiers)
 
-    pc_update["Total"] = (
-        pc_update["Tier 1"]
-        + pc_update["Tier 2"]
-        + pc_update["Tier 3"]
-        + pc_update["No Tier"]
-    )
+    pc_update["Total"] = pc_update["Tier 1"] + pc_update["Tier 2"] + pc_update["Tier 3"]
 
     tuples = [("", "Area")] + [
         ("Coverage (%)", col) for col in pc_update.columns if col != "Area"

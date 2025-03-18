@@ -437,7 +437,7 @@ def main():
         "51fromAbwoTuna": [10, 149],
         "61": [32],
         "77": [86],
-        "Deep Sea": [23, 24, 44, 45, 46, 47, 56],
+        "Deep Sea": [23, 24, 44, 45, 46, 47, 56, 66],
         "Sharks": [20, 24, 48],
     }
     overview = remove_stocks(overview, stocks_to_remove)
@@ -663,6 +663,19 @@ def main():
     angolan_stocks = angolan_stocks[angolan_stocks_mask]
     overview["47"] = pd.concat([overview["47"], angolan_stocks]).reset_index(drop=True)
 
+    # Add Deep Sea stocks back to the FAO Area from which they came
+    # Retrieve location to area map for special groups stocks
+    with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
+        location_to_area = json.load(file)
+
+    overview["Deep Sea"].loc[:, "Area"] = overview["Deep Sea"]["Location"].apply(
+        add_back_to_fao_area,
+        args=(
+            "Deep Sea",
+            location_to_area,
+        ),
+    )
+
     # Fill the NaN Location values with the name of the Area
     for sheet, df in overview.items():
         overview[sheet] = fix_nan_location(df)
@@ -752,10 +765,6 @@ def main():
 
     # Create new dataframe with separate column for FAO major fishing area
     # This maps the special group stocks to their corresponding FAO major fishing area
-    # Retrieve location to area map for special groups stocks
-    with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
-        location_to_area = json.load(file)
-
     assessed_stocks_fao_area = assessed_stocks.copy()
     assessed_stocks_fao_area["FAO Major Fishing Area(s)"] = assessed_stocks_fao_area[
         ["Area", "Location"]

@@ -640,6 +640,32 @@ def fix_nan_location(df):
     return data
 
 
+def add_back_to_fao_area(loc, special_group, loc_to_area):
+    areas = loc_to_area[special_group].get(loc)
+
+    if isinstance(areas, list) and len(areas) == 1:
+        area = areas[0]
+
+        if isinstance(area, (int, float)):
+            return int(area)
+        else:
+            print(
+                f"Location {loc} in category {special_group} maps to Area {area} of wrong type ({type(area)})"
+            )
+
+            return np.nan
+    elif isinstance(areas, list) and len(areas) > 1:
+        msg = (
+            f"Location {loc} in category {special_group} corresponds to multiple FAO Areas. "
+            + "Cannot add back to FAO Area unless it maps to a single FAO Area."
+        )
+        print(msg)
+
+        return np.nan
+    else:
+        return np.nan
+
+
 def use_standard_columns(overview, standard_columns):
     """Selects and standardizes columns in DataFrames based on a dictionary of columns.
 
@@ -757,7 +783,7 @@ def concatenate_data(overview, cols_to_sort=[]):
 def assign_fao_area(row, location_to_area):
     area = row["Area"]
 
-    if isinstance(area, int):
+    if isinstance(area, (int, float)):
         return area
 
     if area == "Salmon":

@@ -63,7 +63,7 @@ def compute_species_landings(
         return pd.Series([np.nan] * len(years), index=years)
 
     # Return dictionary of Area to landings for sharks/deep sea covering more than one FAO area
-    if row["Area"] in ["Sharks", "Deep Sea"]:
+    if row["Area"] == "Sharks":
         if len(areas) == 1:
             area_mask = fishstat["Area"] == areas[0]
             return fishstat[area_mask & sn_mask][years].sum()

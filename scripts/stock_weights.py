@@ -94,6 +94,11 @@ def main():
     # Fix NaN locations
     weights_31_37_81 = fix_nan_location(weights_31_37_81)
 
+    # File for weights of Deep Sea stocks
+    weights_ds = pd.read_excel(os.path.join(input_dir, "deep_sea_weights.xlsx"))
+    weights_ds = weights_ds.rename(columns={"Weight": "Weight 2"})
+    weights_ds = weights_ds[primary_key + ["Weight 2"]]
+
     # Add the weights to the list of assessed stocks
     weights = merge_weights(weights, base_weights, primary_key)
     weights = merge_weights(
@@ -101,6 +106,7 @@ def main():
     )
     weights = merge_weights(weights, weights_india, primary_key, weight1_na=True)
     weights = merge_weights(weights, weights_31_37_81, primary_key)
+    weights = merge_weights(weights, weights_ds, primary_key)
 
     # Assign the normalized weights based off Weight 1 and Weight 2
     # Specify the area for stocks in categorical areas e.g. 48,58,88, Tuna, etc.
@@ -112,66 +118,61 @@ def main():
         specify_area, args=(location_to_area,), axis=1
     )
 
-    # Separate out Shark and Deep Sea stocks into their FAO Areas
+    # Separate out Shark stocks into their FAO Areas
     # Then weights are normalized over these species groups to not double count landings
 
     sharks_mask = weights["Area"] == "Sharks"
-    ds_mask = weights["Area"] == "Deep Sea"
     weights_sharks = weights[sharks_mask].copy()
-    weights_ds = weights[ds_mask].copy()
-    weights_rest = weights[~(sharks_mask | ds_mask)].copy()
+    weights_rest = weights[~(sharks_mask)].copy()
 
     weights_sharks["Area Specific"] = weights_sharks["Area Specific"].apply(
         lambda areas: [int(a) for a in areas.split(", ")]
     )
 
-    weights_ds["Area Specific"] = weights_ds["Area Specific"].apply(
-        lambda areas: [int(a) for a in areas.split(", ")]
-    )
-
     weights_sharks = weights_sharks.explode("Area Specific")
-    weights_ds = weights_ds.explode("Area Specific")
 
-    # Specify weights for Deep Sea stocks based on corresponding stock from Complete_data_weighting.xlsx
-    ds_sn_mask1 = weights_ds["ASFIS Scientific Name"] == "Pandalus borealis"
-    w_sn_mask1 = weights_21_27_67["ASFIS Scientific Name"] == "Pandalus borealis"
-    ds_loc_mask1 = weights_ds["Location"] == "Division 3LNO"
-    w_loc_mask1 = (weights_21_27_67["Location"] == "SFA 7") & (
-        weights_21_27_67["Area"] == 21
-    )
-    weights_ds.loc[ds_sn_mask1 & ds_loc_mask1, "Weight 2"] = weights_21_27_67.loc[
-        w_sn_mask1 & w_loc_mask1, "Weight 2"
-    ].values
+    # # Specify weights for Deep Sea stocks based on corresponding stock from Complete_data_weighting.xlsx
+    # ds_sn_mask1 = weights_ds["ASFIS Scientific Name"] == "Pandalus borealis"
+    # w_sn_mask1 = weights_21_27_67["ASFIS Scientific Name"] == "Pandalus borealis"
+    # ds_loc_mask1 = weights_ds["Location"] == "Division 3LNO"
+    # w_loc_mask1 = (weights_21_27_67["Location"] == "SFA 7") & (
+    #     weights_21_27_67["Area"] == 21
+    # )
+    # weights_ds.loc[ds_sn_mask1 & ds_loc_mask1, "Weight 2"] = weights_21_27_67.loc[
+    #     w_sn_mask1 & w_loc_mask1, "Weight 2"
+    # ].values
 
-    ds_sn_mask2 = weights_ds["ASFIS Scientific Name"] == "Chionoecetes opilio"
-    w_sn_mask2 = weights_21_27_67["ASFIS Scientific Name"] == "Chionoecetes opilio"
-    ds_loc_mask2 = weights_ds["Location"] == "Grand Bank 3LNO"
-    w_loc_mask2 = (
-        weights_21_27_67["Location"]
-        == "Newfoundland and Labrador (Divisions 2HJ3KLNOP4R)"
-    ) & (weights_21_27_67["Area"] == 21)
-    weights_ds.loc[ds_sn_mask2 & ds_loc_mask2, "Weight 2"] = (
-        weights_21_27_67.loc[w_sn_mask2 & w_loc_mask2, "Weight 2"].values / 2
-    )
+    # ds_sn_mask2 = weights_ds["ASFIS Scientific Name"] == "Chionoecetes opilio"
+    # w_sn_mask2 = weights_21_27_67["ASFIS Scientific Name"] == "Chionoecetes opilio"
+    # ds_loc_mask2 = weights_ds["Location"] == "Grand Bank 3LNO"
+    # w_loc_mask2 = (
+    #     weights_21_27_67["Location"]
+    #     == "Newfoundland and Labrador (Divisions 2HJ3KLNOP4R)"
+    # ) & (weights_21_27_67["Area"] == 21)
+    # weights_ds.loc[ds_sn_mask2 & ds_loc_mask2, "Weight 2"] = (
+    #     weights_21_27_67.loc[w_sn_mask2 & w_loc_mask2, "Weight 2"].values / 2
+    # )
 
-    # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2022/scr22-013.pdf -- Table 1, Total (catch) in 2021
-    ds_sn_mask3 = (
-        weights_ds["ASFIS Scientific Name"] == "Sebastes mentella, Sebastes fasciatus"
-    )
-    ds_loc_mask3 = weights_ds["Location"] == "Divisions 3LN Grand Bank"
-    weights_ds.loc[ds_sn_mask3 & ds_loc_mask3, "Weight 2"] = 10_172
+    # # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2022/scr22-013.pdf -- Table 1, Total (catch) in 2021
+    # ds_sn_mask3 = (
+    #     weights_ds["ASFIS Scientific Name"] == "Sebastes mentella, Sebastes fasciatus"
+    # )
+    # ds_loc_mask3 = weights_ds["Location"] == "Divisions 3LN Grand Bank"
+    # weights_ds.loc[ds_sn_mask3 & ds_loc_mask3, "Weight 2"] = 10_172
 
-    # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2022/scr22-044.pdf -- Table 1, Total (catch) in 2021
-    ds_loc_mask4 = weights_ds["Location"] == "Divisions 3O Grand Bank"
-    weights_ds.loc[ds_sn_mask3 & ds_loc_mask4, "Weight 2"] = 5_577
+    # # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2022/scr22-044.pdf -- Table 1, Total (catch) in 2021
+    # ds_loc_mask4 = weights_ds["Location"] == "Divisions 3O Grand Bank"
+    # weights_ds.loc[ds_sn_mask3 & ds_loc_mask4, "Weight 2"] = 5_577
 
-    # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2021/scr21-020.pdf -- Table B4, Landings in 2020
-    ds_sn_mask4 = weights_ds["ASFIS Scientific Name"] == "Hippoglossoides platessoides"
-    ds_loc_mask5 = weights_ds["Location"] == "3LNO"
-    weights_ds.loc[ds_sn_mask4 & ds_loc_mask5, "Weight 2"] = 1_175
+    # # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2021/scr21-020.pdf -- Table B4, Landings in 2020
+    # ds_sn_mask4 = weights_ds["ASFIS Scientific Name"] == "Hippoglossoides platessoides"
+    # ds_loc_mask5 = weights_ds["Location"] == "3LNO"
+    # weights_ds.loc[ds_sn_mask4 & ds_loc_mask5, "Weight 2"] = 1_175
+
+    # weights_ds
 
     weights_exp = (
-        pd.concat([weights_rest, weights_sharks, weights_ds])
+        pd.concat([weights_rest, weights_sharks])
         .sort_values(["Area", "ASFIS Scientific Name", "Location"])
         .reset_index(drop=True)
     )

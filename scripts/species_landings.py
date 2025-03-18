@@ -92,22 +92,18 @@ def main():
         sardinella_landings / n_sardinella
     ).values
 
-    # Use Sebastes spp landings for Sebastes mentella, Sebastes fasciatus in Deep Sea
+    # Use Sebastes spp landings for Sebastes mentella, Sebastes fasciatus in Area 21
     sebastes_spp_mask = fishstat["ASFIS Scientific Name"] == "Sebastes spp"
-    sebastes_area_mask = fishstat["Area"].isin(
-        location_to_area["Deep Sea"]["Divisions 3LN Grand Bank"]
-    )
+    sebastes_area_mask = fishstat["Area"] == 21
     sebastes_landings = fishstat[sebastes_spp_mask & sebastes_area_mask][years].sum()
 
     sebastes_mask = (
         species_landings["ASFIS Scientific Name"]
         == "Sebastes mentella, Sebastes fasciatus"
     )
-    deep_sea_mask = species_landings["Area"] == "Deep Sea"
+    area_21_mask = species_landings["Area"] == 21
 
-    species_landings.loc[sebastes_mask & deep_sea_mask, years] = (
-        sebastes_landings.values
-    )
+    species_landings.loc[sebastes_mask & area_21_mask, years] = sebastes_landings.values
     print("Species landings computed")
 
     # Save stocks with species landings
