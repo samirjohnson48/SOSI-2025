@@ -363,7 +363,7 @@ def main():
         if isinstance(area, int) or area == "48,58,88"
     ]
     
-    # Get area specific shark and deep sea landings for percent coverage calculations
+    # Get area specific shark landings for percent coverage calculations
     stock_weights = pd.read_excel(os.path.join(clean_data_dir, "stock_weights.xlsx"))
     
     shark_area_landings = compute_sg_area_landings(stock_weights, species_landings, "Sharks", location_to_area)
@@ -415,7 +415,7 @@ def main():
     # Add footnote to table describing process of computation
     pc_footnote = (
         "NOTE: Percent coverages are performed across FAO major fishing areas to be consistent with Fishstatj. \n"
-        + "Thus, landings from areas such as 'Salmon', 'Tuna', 'Deep Sea', and 'Sharks' are added back into the FAO major fishing area from where they were reported. \n"
+        + "Thus, landings from areas such as 'Salmon', 'Tuna', and 'Sharks' are added back into the FAO major fishing area from where they were reported. \n"
         + f"Percent coverage calculations do not include landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
         + "except for stocks from these groups which are included in the assessment."
     )
@@ -497,7 +497,7 @@ def main():
     # per area does not correspond to the percent coverage (doesn't account for addition of Tuna landings, etc.)
     sbl_footnote1 = (
         "Note: Percent coverage in this sheet does not reflect reported percent coverage. For the reported percent coverage, \n"
-        + "the landings of 'Deep Sea', 'Salmon', 'Tuna', and 'Sharks' are incorporated in the FAO major fishing areas \n"
+        + "the landings of 'Salmon', 'Tuna', and 'Sharks' are incorporated in the FAO major fishing areas \n"
         + "from which their landings are reported. Thus, percent coverage calculated from this table will slightly different than reported elsewhere. \n"
         + f"Area landings exclude landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
         + "except for stocks which have been incorporated in assessment."
@@ -515,7 +515,7 @@ def main():
     
     sbl_footnote2 = (
         "Note: Percent coverage in this sheet does not reflect reported percent coverage. For the reported percent coverage, \n"
-        + "the landings of 'Deep Sea', 'Salmon', and 'Sharks' are incorporated in the FAO major fishing areas \n"
+        + "the landings of 'Salmon', and 'Sharks' are incorporated in the FAO major fishing areas \n"
         + "from which their landings are reported. Thus, percent coverage calculated from this table will slightly different than reported elsewhere. \n"
         + f"Area landings exclude landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
         + "except for stocks which have been incorporated in assessment. \n"
@@ -538,8 +538,8 @@ def main():
     sbl_footnote3 = ( 
         f"Note: Area landings exclude landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
         + "except for stocks which have been incorporated in assessment. \n"
-        + "'Deep Sea', 'Salmon', 'Sharks', and 'Tuna' status/landings have been incorporated into FAO area weighted percentages, \n"
-        + "so these will appear different compared to tables with 'Deep Sea', 'Salmon', 'Sharks', and 'Tuna' categories separated."
+        + "'Salmon', 'Sharks', and 'Tuna' status/landings have been incorporated into FAO area weighted percentages, \n"
+        + "so these will appear different compared to tables with 'Salmon', 'Sharks', and 'Tuna' categories separated."
     )
     wp_totl_wo_sg = get_weighted_percentages_and_total_landings(
         wp_wo_sg,
