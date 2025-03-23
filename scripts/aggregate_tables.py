@@ -170,6 +170,16 @@ def main():
     sos = compute_summary_of_stocks(stock_assessments_full)
     sos_fp = os.path.join(output_dir, "summary_of_stocks.xlsx")
     sos.to_excel(sos_fp)
+    
+    # Create summary of areas by tier and save file
+    summary_area_tier = compute_summary_area_by_tier(stock_assessments)
+    summary_area_tier_fp = os.path.join(output_dir, "summary_of_areas_by_tier.xlsx")
+    
+    with pd.ExcelWriter(summary_area_tier_fp) as writer:
+        for tier, summary in summary_area_tier.items():
+            summary.to_excel(writer, sheet_name=tier)
+            
+    round_excel_file(summary_area_tier_fp)
 
     # Save same aggregations for individual areas
     area_summary_dir = os.path.join(output_dir, "Area Statistics")
@@ -184,6 +194,13 @@ def main():
             stock_assessments_full[stock_assessments_full["Area"] == area]
         )
         cbn = sbn_comp[sbn_comp[("", "Area")] == area]
+        
+        sat = pd.DataFrame()
+        for tier, summary in summary_area_tier.items():
+            if area in summary.index:
+                tier_sat = summary.loc[area].to_frame().T
+                tier_sat.index=[tier]
+                sat = pd.concat([sat, tier_sat])
 
         area_summary_fp = os.path.join(area_summary_dir, f"area_{area}_summary.xlsx")
 
@@ -191,6 +208,7 @@ def main():
             sbna.to_excel(writer, sheet_name="Status by Number")
             sbnt.to_excel(writer, sheet_name="Status by Tier")
             sosa.to_excel(writer, sheet_name="Summary of Stocks")
+            sat.to_excel(writer, sheet_name="Summary of Area by Tier")
 
             if area in sbn_comp[("", "Area")].unique():
                 cbn.to_excel(writer, sheet_name="Comparison by Number")
@@ -356,36 +374,21 @@ def main():
     seals_mask = stock_landings["ISSCAAP Code"] == 63
     stock_landings = stock_landings[~seals_mask]
     
-    # Define areas for percent coverage reporting
-    areas = [
-        area
-        for area in stock_landings["Area"].unique()
-        if isinstance(area, int) or area == "48,58,88"
-    ]
-    
-    # Get area specific shark landings for percent coverage calculations
-    stock_weights = pd.read_excel(os.path.join(clean_data_dir, "stock_weights.xlsx"))
-    
-    shark_area_landings = compute_sg_area_landings(stock_weights, species_landings, "Sharks", location_to_area)
-    
+    # Compute percent coverage
     pc = compute_percent_coverage(
         stock_landings,
+        species_landings,
         fishstat,
-        areas,
         isscaap_to_remove,
-        assessment="Update",
-        location_to_area=location_to_area,
-        shark_area_landings=shark_area_landings,
+        assessment="Update"
     )
 
     # Compute percent coverage across tiers
     pc_tiers = compute_percent_coverage_tiers(
         stock_landings,
+        species_landings,
         fishstat,
-        areas,
         isscaap_to_remove,
-        location_to_area=location_to_area,
-        shark_area_landings=shark_area_landings,
     )
     # Retrieve SOFIA with landings
     sofia_landings = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
@@ -400,50 +403,27 @@ def main():
     # Compute percent coverage for SOFIA data
     pc_sofia = compute_percent_coverage(
         sofia_landings,
+        species_landings,
         fishstat,
-        areas,
         isscaap_to_remove,
         assessment="Previous",
-        sn_key="Proxy",
-        landings_key=2021,
-        location_to_area=location_to_area,
+        landings_key=2021
     )
 
     # Compute and save the comparison of percent coverage
-    pc_comp = pd.merge(pc_sofia, pc, on="Area")
-
-    # Add footnote to table describing process of computation
-    pc_footnote = (
-        "NOTE: Percent coverages are performed across FAO major fishing areas to be consistent with Fishstatj. \n"
-        + "Thus, landings from areas such as 'Salmon', 'Tuna', and 'Sharks' are added back into the FAO major fishing area from where they were reported. \n"
-        + f"Percent coverage calculations do not include landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
-        + "except for stocks from these groups which are included in the assessment."
-    )
+    pc_comp = pd.merge(pc_sofia, pc, on="Area", how="right")
 
     pc_comp_fp = os.path.join(output_dir, "percent_coverage_comparison.xlsx")
-    add_footnote(pc_comp, pc_footnote).to_excel(pc_comp_fp, index=False)
+    pc_comp.to_excel(pc_comp_fp, index=False)
     round_excel_file(pc_comp_fp)
 
     # Save percent coverage across tiers
     pc_tiers_fp = os.path.join(output_dir, "percent_coverage_tiers.xlsx")
-    add_footnote(pc_tiers, pc_footnote, multi_index=True).to_excel(pc_tiers_fp)
+    pc_tiers.to_excel(pc_tiers_fp)
     round_excel_file(pc_tiers_fp)
 
     # Compute weighted percentages with and w/o Tunas category
     wp_area = compute_weighted_percentages(stock_landings)
-    wp_wo_tuna = compute_weighted_percentages(
-        stock_landings,
-        fishstat=fishstat,
-        location_to_area={"Tuna": location_to_area["Tuna"]},
-    )   
-    
-    wp_wo_sg = compute_weighted_percentages(
-        stock_landings,
-        fishstat=fishstat,
-        location_to_area={"Tuna": location_to_area["Tuna"]},
-        add_salmon=True,
-        shark_area_landings=shark_area_landings,
-    )
     
     # Compute weighted percentages for SOFIA
     # Get assessed stocks from SOFIA data
@@ -471,15 +451,10 @@ def main():
     wp_area.to_excel(wp_area_fp)
     round_excel_file(wp_area_fp)
 
-    # Save the updated weighted percentages w/o Tuna separate
-    wp_wo_tuna_fp = os.path.join(output_dir, "status_by_landings_area_wo_tuna.xlsx")
-    wp_wo_tuna.to_excel(wp_wo_tuna_fp)
-    round_excel_file(wp_wo_tuna_fp)
-
     # Save the comparison by landings of updated and previous method
     wp_comp_fp = os.path.join(output_dir, "comparison_by_landings.xlsx")
     # Add percent coverage footnote
-    add_footnote(wp_comp, pc_footnote, multi_index=True).to_excel(wp_comp_fp)
+    wp_comp.to_excel(wp_comp_fp)
     round_excel_file(wp_comp_fp)
 
     # Compute weighted percentages across tiers
@@ -495,67 +470,13 @@ def main():
 
     # Save wp w/totals w/footnote explaining why assessed landings / total landings * 100
     # per area does not correspond to the percent coverage (doesn't account for addition of Tuna landings, etc.)
-    sbl_footnote1 = (
-        "Note: Percent coverage in this sheet does not reflect reported percent coverage. For the reported percent coverage, \n"
-        + "the landings of 'Salmon', 'Tuna', and 'Sharks' are incorporated in the FAO major fishing areas \n"
-        + "from which their landings are reported. Thus, percent coverage calculated from this table will slightly different than reported elsewhere. \n"
-        + f"Area landings exclude landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
+    sbl_footnote = (
+        f"Note: Area landings exclude landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
         + "except for stocks which have been incorporated in assessment."
     )
     wp_totl_fp = os.path.join(output_dir, "status_by_landings_w_totals_area.xlsx")
-    add_footnote(wp_totl, sbl_footnote1, multi_index=True).to_excel(wp_totl_fp)
+    add_footnote(wp_totl, sbl_footnote, multi_index=True).to_excel(wp_totl_fp)
     round_excel_file(wp_totl_fp)
-
-    # Get same but w/o tunas as separate area
-    # Compute tuna landings to add back into total landings for each area
-    tuna_mask = stock_assessments["Area"] == "Tuna"
-    tuna_list = stock_assessments[tuna_mask]["ASFIS Scientific Name"].unique()
-    fs_tuna_mask = fishstat["ASFIS Scientific Name"].isin(tuna_list)
-    fs_tuna = fishstat[fs_tuna_mask].groupby("Area")[2021].sum().reset_index()
-    
-    sbl_footnote2 = (
-        "Note: Percent coverage in this sheet does not reflect reported percent coverage. For the reported percent coverage, \n"
-        + "the landings of 'Salmon', and 'Sharks' are incorporated in the FAO major fishing areas \n"
-        + "from which their landings are reported. Thus, percent coverage calculated from this table will slightly different than reported elsewhere. \n"
-        + f"Area landings exclude landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
-        + "except for stocks which have been incorporated in assessment. \n"
-        + "Tuna status/landings have been incorporated into FAO area weighted percentages, so these will appear different \n"
-        + "compared to tables with Tuna category separated."
-    )
-    wp_totl_wo_tuna = get_weighted_percentages_and_total_landings(
-        wp_wo_tuna, appendix_decs, tuna_landings=fs_tuna
-    )
-    wp_totl_wo_tuna_fp = os.path.join(
-        output_dir, "status_by_landings_w_totals_wo_tuna.xlsx"
-    )
-    add_footnote(wp_totl_wo_tuna, sbl_footnote2, multi_index=True).to_excel(
-        wp_totl_wo_tuna_fp
-    )
-    round_excel_file(wp_totl_wo_tuna_fp)
-    
-    # Get the same but with special groups (only numerical areas)
-    # Use fishstat directly to compute total landings in area
-    sbl_footnote3 = ( 
-        f"Note: Area landings exclude landings from ISSCAAP codes {", ".join([str(i) for i in isscaap_to_remove])}, \n"
-        + "except for stocks which have been incorporated in assessment. \n"
-        + "'Salmon', 'Sharks', and 'Tuna' status/landings have been incorporated into FAO area weighted percentages, \n"
-        + "so these will appear different compared to tables with 'Salmon', 'Sharks', and 'Tuna' categories separated."
-    )
-    wp_totl_wo_sg = get_weighted_percentages_and_total_landings(
-        wp_wo_sg,
-        fishstat=fishstat,
-        isscaap_to_remove=isscaap_to_remove,
-        areas=numerical_areas,
-        special_groups=False
-    )
-    wp_totl_wo_sg_fp = os.path.join(
-        output_dir, "status_by_landings_w_totals_fao_areas.xlsx"
-    )
-    add_footnote(wp_totl_wo_sg, sbl_footnote3, multi_index=True).to_excel(
-        wp_totl_wo_sg_fp
-    )
-    round_excel_file(wp_totl_wo_sg_fp)
-    
 
     # Compute weighted percentages across tiers per area
     wp_tiers_area = get_weighted_percentages_by_tier_and_area(stock_landings, wp_totl)
@@ -567,11 +488,15 @@ def main():
 
     # Save aggregations for areas individually
     for area in stock_landings["Area"].unique():
-        wp = wp_area.loc[area]
+        wp = wp_area.loc[area].to_frame().T
+        
         wpt = compute_weighted_percentages(
-            stock_landings[stock_landings["Area"] == area], "Tier"
+            stock_landings[stock_landings["Area"] == area], key="Tier"
         )
-        cbl = wp_comp.loc[area] if area in wp_comp.index else None
+        area_lbl = f"Area {area} Total" if isinstance(area, int) or area=="48,58,88" else f"{area} Total"
+        wpt.index = list(wpt.index[:-1]) + [area_lbl]
+        
+        cbl = wp_comp.loc[area].to_frame().T if area in wp_comp.index else None
 
         area_summary_fp = os.path.join(
             output_dir, os.path.join("Area Statistics", f"area_{area}_summary.xlsx")

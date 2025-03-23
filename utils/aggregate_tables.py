@@ -171,10 +171,10 @@ def compute_summary_of_stocks(data, group="Tier"):
     )
 
     summary = (
-        data.groupby("Tier")
+        data.groupby(group)
         .agg(
             {
-                "Tier": "size",
+                group: "size",
                 "Status": lambda x: x.isin(["U", "M", "O"]).sum(),
                 "ASFIS Scientific Name": lambda x: x[assessed_data_mask].nunique(),
                 "ISSCAAP Code": lambda x: x[
@@ -184,7 +184,7 @@ def compute_summary_of_stocks(data, group="Tier"):
         )
         .rename(
             columns={
-                "Tier": "Total stocks",
+                group: "Total stocks",
                 "Status": "Total assessed stocks",
                 "ASFIS Scientific Name": "Total ASFIS species (from total assessed stocks)",
                 "ISSCAAP Code": "Total ISSCAAP Groups (from total assessed stocks)",
@@ -192,16 +192,41 @@ def compute_summary_of_stocks(data, group="Tier"):
         )
     )
 
-    # Add a Total row
-    summary.loc["Total"] = summary.sum()
-    summary.loc["Total", "Total ASFIS species (from total assessed stocks)"] = data.loc[
+    summary.loc["Global"] = summary.sum()
+    summary.loc["Global", "Total ASFIS species (from total assessed stocks)"] = data.loc[
         assessed_data_mask, "ASFIS Scientific Name"
     ].nunique()
-    summary.loc["Total", "Total ISSCAAP Groups (from total assessed stocks)"] = (
+    summary.loc["Global", "Total ISSCAAP Groups (from total assessed stocks)"] = (
         data.loc[assessed_data_mask & numeric_isscaap_mask, "ISSCAAP Code"].nunique()
     )
 
     return summary
+
+def compute_summary_area_by_tier(data):
+    tier_summaries = {}
+    
+    for tier in [1,2,3]:
+        tier_mask = data["Tier"] == tier
+        
+        df = data[tier_mask].copy()
+        
+        sos = compute_summary_of_stocks(df, group="Area")
+    
+        rename_dict = {
+            "Total assessed stocks": "No. of stocks",
+            "Total ASFIS species (from total assessed stocks)": "No. of ASFIS species",
+            "Total ISSCAAP Groups (from total assessed stocks)": "No. of ISSCAAP groups"
+        }
+        
+        sos = sos.rename(columns=rename_dict).drop(columns=["Total stocks"])
+        
+        sbn = compute_status_by_number(df, "Area").set_index("Area").drop(columns="No. of stocks")
+        
+        comb = pd.merge(sos, sbn, left_index=True, right_index=True)
+        
+        tier_summaries[f"Tier {tier}"] = comb
+            
+    return tier_summaries
 
 
 def convert_status_to_list(status):
@@ -262,6 +287,196 @@ def compute_species_status_by_number(data, species_list, fishstat):
 
     return result
 
+def convert_sg_landings_long(special_group, species_landings, year_start=1950, year_end=2021):        
+    sl_sg_mask = species_landings["Area"] == special_group
+    sl_sg = species_landings[sl_sg_mask].copy()
+    sl_wo_sg = species_landings[~sl_sg_mask].copy()
+
+    sg_list = sl_sg["ASFIS Scientific Name"].unique()
+
+    area_sg_mask = sl_wo_sg["ASFIS Scientific Name"].isin(sg_list)
+    sl_area_sg = sl_wo_sg[area_sg_mask]
+    sl_area_sg_set = set(
+        zip(sl_area_sg["Area"], sl_area_sg["ASFIS Scientific Name"])
+    )
+
+    def convert_sg_landings(row, years, sg_set=sl_area_sg_set):
+        sn = row["ASFIS Scientific Name"]
+
+        sl_tot_dict = {}
+
+        for year in years:
+            if isinstance(row[year], (int, float)):
+                sl_tot_dict[year] = row[year]
+            else:
+                sl_dict = json.loads(row[year])
+
+                sl_tot = sum(
+                    sl_dict[area]
+                    for area in sl_dict.keys()
+                    if (int(area), sn) not in sg_set
+                )
+
+                sl_tot_dict[year] = sl_tot
+
+        return pd.Series(sl_tot_dict)
+
+    years = list(range(year_start, year_end + 1))
+
+    sl_sg[years] = sl_sg.apply(convert_sg_landings, args=(years,), axis=1)
+
+    sl = (
+        pd.concat([sl_wo_sg, sl_sg])
+        .reset_index(drop=True)
+        .sort_values(["Area", "ASFIS Scientific Name", "Location"])
+    )
+    
+    return sl
+
+def compute_total_area_landings(area, fishstat, species_landings, special_groups=["Salmon", "Sharks", "Tuna"], isscaap_to_remove=[], year_start=1950, year_end=2021, special_groups_to_convert=[]):
+    # Convert special groups with landings saved as dictionary back to numeric
+    if area in special_groups_to_convert:
+        sl = convert_sg_landings_long(area, species_landings, year_start, year_end)
+    else:
+        sl = species_landings.copy()
+    
+    # Define special groups masks to either take out special group landings from FAO Areas
+    # or calculate landings for special group categories
+    
+    sg_masks = {}
+        
+    for sg in special_groups:
+        sg_masks[sg] = {}
+                        
+        sl_mask = sl["Area"] == sg
+        sg_list = sl[sl_mask]["ASFIS Scientific Name"].unique()
+        
+        sg_area_mask = fishstat["Area"] == 67 if sg == "Salmon" else pd.Series(True, index=fishstat.index)
+        
+        sg_mask_cap = fishstat["ASFIS Scientific Name"].isin(sg_list) & sg_area_mask
+        
+        sg_masks[sg]["fishstat"] = sg_mask_cap
+        
+        sg_mask_sl = sl["ASFIS Scientific Name"].isin(sg_list)
+        
+        if sg == "Salmon":
+            sg_mask_sl = sg_mask_sl & sl["Area"] == 67
+        
+        sg_masks[sg]["sl"] = sg_mask_sl
+            
+    if area in special_groups:
+        cap = fishstat[sg_masks[area]["fishstat"]]
+        
+        years = list(range(year_start, year_end + 1))
+        
+        total_cap = cap[years].sum()
+        
+        # Remove landings from sharks which are reported in FAO Areas in assessment
+        
+        if area == "Sharks":
+            numeric_areas = [
+                area
+                for area in sl["Area"].unique()
+                if isinstance(area, int) or area == "48,58,88"
+            ]
+            numeric_areas_mask = sl["Area"].isin(numeric_areas)
+
+            sl_sg_cap = sl[sg_masks[area]["sl"] & numeric_areas_mask]
+            
+            sl_sg_cap = sl_sg_cap.drop_duplicates(subset=["Area", "ASFIS Scientific Name"])
+
+            total_cap -= sl_sg_cap[years].sum()
+                        
+            total_area = sl[sl["Area"]==area][years].sum()
+        
+            total_cap = total_cap.combine(total_area, max)
+        
+        return total_cap
+    
+    if area == "48,58,88":
+        area_list = [48, 58, 88]
+    else:
+        area_list = [area]
+        
+    area_mask_cap = fishstat["Area"].isin(area_list)
+    
+    isscaap_mask_cap = ~fishstat["ISSCAAP Code"].isin(isscaap_to_remove)
+    
+    all_sg_mask_cap = pd.Series(False, index=area_mask_cap.index)
+    
+    for sg, masks_dict in sg_masks.items():
+        all_sg_mask_cap = all_sg_mask_cap | masks_dict["fishstat"]
+        
+    cap = fishstat[area_mask_cap & isscaap_mask_cap & ~all_sg_mask_cap]
+        
+    # Add special group landings back to cap which appear reported in FAO Area in assessment
+    
+    sl_area_mask = sl["Area"] == area
+    
+    for sg in special_groups:
+        sg_in_area = sl[sl_area_mask & sg_masks[sg]["sl"]]
+        sg_in_area = sg_in_area.drop_duplicates(subset="ASFIS Scientific Name")
+        
+        if not sg_in_area.empty:
+            cap = pd.concat([cap, sg_in_area])
+    
+    # Add landings from assessed stocks in ISSCAAP Groups which have been removed
+    sl_isscaap_mask = sl["ISSCAAP Code"].isin(isscaap_to_remove)
+    
+    lta = sl[sl_area_mask & sl_isscaap_mask]
+    
+    if not lta.empty:
+        cap = pd.concat([cap, lta])
+            
+    years = list(range(year_start, year_end + 1))
+        
+    total_cap = cap[years].sum()
+            
+    return total_cap
+    
+        
+def compute_total_aquaculture_landings(area, aquaculture, species_landings, special_groups=["Salmon", "Sharks", "Tuna"], isscaap_to_remove=[], year_start=1950, year_end=2021):
+    sg_masks = {}
+    
+    for sg in special_groups:
+        sl_mask = species_landings["Area"] == sg
+        sg_list = species_landings[sl_mask]["ASFIS Scientific Name"].unique()
+        
+        sg_area_mask = aquaculture["Area"] == 67 if sg == "Salmon" else pd.Series(True, index=aquaculture.index)
+        
+        sg_mask_aqua = aquaculture["ASFIS Scientific Name"].isin(sg_list) & sg_area_mask
+        
+        sg_masks[sg] = sg_mask_aqua
+        
+    years = list(range(year_start, year_end + 1))
+        
+    if area in special_groups:
+        aqua = aquaculture[sg_masks[area]]
+        
+        total_aqua = aqua[years].sum()
+        
+        return total_aqua
+    
+    if area == "48,58,88":
+        area_list = [48, 58, 88]
+    else:
+        area_list = [area]
+        
+    area_mask = aquaculture["Area"].isin(area_list)
+    
+    isscaap_mask = ~aquaculture["ISSCAAP Code"].isin(isscaap_to_remove)
+    
+    all_sg_mask = pd.Series(False, index=area_mask.index)
+    
+    for sg, mask in sg_masks.items():
+        all_sg_mask = all_sg_mask | mask
+        
+    aqua = aquaculture[area_mask & isscaap_mask & ~all_sg_mask]
+    
+    total_aqua = aqua[years].sum()
+            
+    return total_aqua
+
 
 def compute_appendix_landings(
     species_landings,
@@ -278,53 +493,8 @@ def compute_appendix_landings(
 ):
     # Convert Shark species landings from dictionary back to total number
     # Exclude landings from sharks in FAO areas
-
-    sl_sharks_mask = species_landings["Area"] == "Sharks"
-    sl_sharks = species_landings[sl_sharks_mask].copy()
-    sl_no_sharks = species_landings[~sl_sharks_mask].copy()
-
-    sharks_list = sl_sharks["ASFIS Scientific Name"].unique()
-
-    area_sharks_mask = sl_no_sharks["ASFIS Scientific Name"].isin(sharks_list)
-    sl_area_sharks = sl_no_sharks[area_sharks_mask]
-    sl_area_sharks_set = set(
-        zip(sl_area_sharks["Area"], sl_area_sharks["ASFIS Scientific Name"])
-    )
-
-    def convert_shark_landings(row, years, sharks_set=sl_area_sharks_set):
-        sn = row["ASFIS Scientific Name"]
-
-        sl_tot_dict = {}
-
-        for year in years:
-            if isinstance(row[year], (int, float)):
-                sl_tot_dict[year] = row[year]
-            else:
-                sl_dict = json.loads(row[year])
-
-                sl_tot = sum(
-                    sl_dict[area]
-                    for area in sl_dict.keys()
-                    if (int(area), sn) not in sharks_set
-                )
-
-                sl_tot_dict[year] = sl_tot
-
-        return pd.Series(sl_tot_dict)
-
-    years = list(range(year_start, year_end + 1))
-
-    sl_sharks[years] = sl_sharks.apply(convert_shark_landings, args=(years,), axis=1)
-
-    sl = (
-        pd.concat([sl_no_sharks, sl_sharks])
-        .reset_index(drop=True)
-        .sort_values(["Area", "ASFIS Scientific Name", "Location"])
-    )
-
-    # Exclude Deep Sea since we cannot calculate total Deep Sea landings from fishstat
-    ds_mask = sl["Area"] == "Deep Sea"
-    sl = sl[~ds_mask]
+    
+    sl = convert_sg_landings_long("Sharks", species_landings, year_start=year_start, year_end=year_end)
 
     # Group the Status and Uncertainty by tier
     def aggregate_status_by_tier(group, status_vals=["U", "M", "O"]):
@@ -442,7 +612,12 @@ def compute_appendix_landings(
         d = data.copy()
         for start in range(year_start, last_decade_year + 1, 10):
             end = start + 9
-            d[f"{start}-{end}"] = data.loc[:, range(start, end + 1)].mean(axis=1)
+            
+            if isinstance(data, pd.DataFrame):
+                d[f"{start}-{end}"] = data.loc[:, range(start, end + 1)].mean(axis=1)
+            elif isinstance(data, pd.Series):
+                d[f"{start}-{end}"] = data.loc[start:end].mean()
+                
         return d
 
     species_landings_dec = create_decade_cols(species_landings_dec)
@@ -505,11 +680,6 @@ def compute_appendix_landings(
     # Create decade columns for aquaculture
     aquaculture = create_decade_cols(aquaculture)
 
-    # Define the landings to be added back in
-    # i.e. assessed stocks which are included in the ISSCAAP groups removed
-    sldec_isscaap_mask = species_landings_dec["ISSCAAP Code"].isin(isscaap_to_remove)
-    landings_to_add = species_landings_dec[sldec_isscaap_mask]
-
     # Build the appendix landings sheets
     # Data with decade columns
     summaries_w_dec = {}
@@ -564,123 +734,16 @@ def compute_appendix_landings(
         ]
 
         total_area = area_landings[get_numeric_cols(area_landings.columns)].sum()
-
-        if area == "48,58,88":
-            area_list = [48, 58, 88]
-        else:
-            area_list = [area]
-
-        # Define Tuna, Shark, and Salmon masks
-        # These will be taken out of numerical areas so as to not double count
-
-        # Tunas
-        sl_tuna_mask = species_landings["Area"] == "Tuna"
-        tuna_list = species_landings[sl_tuna_mask]["ASFIS Scientific Name"].unique()
-        tuna_mask_cap = fishstat["ASFIS Scientific Name"].isin(tuna_list)
-        tuna_mask_aqua = aquaculture["ASFIS Scientific Name"].isin(tuna_list)
-
-        # Sharks
-        sl_sharks_mask = species_landings["Area"] == "Sharks"
-        sharks_list = species_landings[sl_sharks_mask]["ASFIS Scientific Name"].unique()
-        sharks_mask_cap = fishstat["ASFIS Scientific Name"].isin(sharks_list)
-        sharks_mask_aqua = aquaculture["ASFIS Scientific Name"].isin(sharks_list)
-
-        # Salmon
-        sl_salmon_mask = species_landings["Area"] == "Salmon"
-        salmon_list = species_landings[sl_salmon_mask]["ASFIS Scientific Name"].unique()
-        salmon_mask_cap = fishstat["ASFIS Scientific Name"].isin(salmon_list) & (
-            fishstat["Area"] == 67
-        )
-        salmon_mask_aqua = (aquaculture["ASFIS Scientific Name"].isin(salmon_list)) & (
-            aquaculture["Area"] == 67
-        )
-
-        # Masks for numerical areas
-        area_mask_cap = fishstat["Area"].isin(area_list)
-        area_mask_aqua = aquaculture["Area"].isin(area_list)
-        isscaap_mask_cap = ~fishstat["ISSCAAP Code"].isin(isscaap_to_remove)
-        isscaap_mask_aqua = ~aquaculture["ISSCAAP Code"].isin(isscaap_to_remove)
-
-        # Define total landings for the areas
-        if area == "Tuna":
-            cap = fishstat[tuna_mask_cap]
-            aqua = aquaculture[tuna_mask_aqua]
-        elif area == "Sharks":
-            cap = fishstat[sharks_mask_cap]
-            aqua = aquaculture[sharks_mask_aqua]
-        elif area == "Salmon":
-            cap = fishstat[salmon_mask_cap]
-            aqua = aquaculture[salmon_mask_aqua]
-        else:
-            # Take out Tuna, Sharks, and Salmon from numerical areas
-            cap = fishstat[
-                area_mask_cap
-                & isscaap_mask_cap
-                & ~tuna_mask_cap
-                & ~sharks_mask_cap
-                & ~salmon_mask_cap
-            ]
-            # Add tuna and sharks which were listed in numerical areas back to total capture
-            sl_area_mask = species_landings["Area"] == area
-
-            tuna_mask = species_landings["ASFIS Scientific Name"].isin(tuna_list)
-            tuna_in_area = species_landings[sl_area_mask & tuna_mask].drop_duplicates(
-                subset="ASFIS Scientific Name"
-            )
-
-            if not tuna_in_area.empty:
-                cap = pd.concat([cap, tuna_in_area])
-
-            sharks_mask = species_landings["ASFIS Scientific Name"].isin(sharks_list)
-            sharks_in_area = species_landings[
-                sl_area_mask & sharks_mask
-            ].drop_duplicates(subset="ASFIS Scientific Name")
-
-            if not sharks_in_area.empty:
-                cap = pd.concat([cap, sharks_in_area])
-
-            aqua = aquaculture[
-                area_mask_aqua
-                & isscaap_mask_aqua
-                & ~tuna_mask_aqua
-                & ~sharks_mask_aqua
-                & ~salmon_mask_aqua
-            ]
-
-        cap = create_decade_cols(cap)
-        cap = cap.drop(columns=["Alpha3_Code"])
-
-        total_cap = cap[get_numeric_cols(cap.columns)].sum() / 1e3
-
-        # Take out shark landings from sharks reported in FAO areas
-        if area == "Sharks":
-            sl_sharks_mask_cap = species_landings_dec["ASFIS Scientific Name"].isin(
-                sharks_list
-            )
-            numeric_areas = [
-                area
-                for area in species_landings["Area"].unique()
-                if isinstance(area, int) or area == "48,58,88"
-            ]
-            numeric_areas_mask = species_landings_dec["Area"].isin(numeric_areas)
-
-            sl_sharks_cap = species_landings_dec[
-                sl_sharks_mask_cap & numeric_areas_mask
-            ]
-
-            total_cap -= sl_sharks_cap[get_numeric_cols(sl_sharks_cap.columns)].sum()
-
-            total_cap = total_cap.combine(total_area, max)
-
-        if area in landings_to_add["Area"].unique():
-            additional_landings = landings_to_add[landings_to_add["Area"] == area][
-                get_numeric_cols(landings_to_add.columns)
-            ].sum()
-            total_cap = total_cap.add(additional_landings, fill_value=0)
+        
+        total_cap = compute_total_area_landings(area, fishstat, species_landings, isscaap_to_remove=isscaap_to_remove, special_groups_to_convert=["Sharks"]) / 1e3
+        
+        total_cap = create_decade_cols(total_cap)
 
         diff_cap = total_cap - total_area
-
-        total_aqua = aqua[get_numeric_cols(aqua.columns)].sum() / 1e3
+        
+        total_aqua = compute_total_aquaculture_landings(area, aquaculture, species_landings, isscaap_to_remove=isscaap_to_remove) / 1e3
+                
+        total_aqua = create_decade_cols(total_aqua)
 
         total_production = total_cap + total_aqua
 
@@ -735,9 +798,6 @@ def compute_appendix_landings(
 
         summaries_w_dec[area] = area_summary_dec
         summaries_w_year[area] = area_summary_years
-
-        if area == 21:
-            area_summary_dec.to_clipboard()
 
     return summaries_w_dec, summaries_w_year
 
@@ -1178,167 +1238,65 @@ def remove_isscaap_fishstat(
 
 def compute_percent_coverage(
     stock_landings,
+    species_landings,
     fishstat,
-    areas,
     isscaap_to_remove,
-    assessment="Update",
-    sn_key="ASFIS Scientific Name",
     landings_key="Stock Landings 2021",
+    special_groups=["Salmon", "Sharks", "Tuna"],
+    assessment="",
     tier=None,
-    extra_stocks_map={},
     year=2021,
-    location_to_area={},
-    shark_area_landings=pd.DataFrame(),
 ):
-    if tier:
-        if tier == "Missing":
-            sl = stock_landings[stock_landings["Tier"].isna()]
-        else:
-            sl = stock_landings[stock_landings["Tier"] == tier]
-    else:
-        sl = stock_landings.copy()
-
-    percent_coverage = {}
-
-    # Remove ISSCAAP groups from Fishstat data for correct total landings per area
-    fs = remove_isscaap_fishstat(
-        fishstat, stock_landings, isscaap_to_remove, landings_key, year
-    )
-
-    for area in areas:
-        coverage = sl[sl["Area"] == area][landings_key].sum()
-
-        fs_area_mask = fs["Area"] == area
-
-        # See if additional unassessed stocks need to be added to coverage
-        extra_stocks_total = 0
-        extra_stocks_added = []
-        if assessment in extra_stocks_map and area in extra_stocks_map[assessment]:
-            extra_stocks_tiers = extra_stocks_map[assessment][area]
-
-            for t, extra_stocks in extra_stocks_tiers.items():
-                if not tier or t == tier:
-                    extra_stocks_mask = fs["ASFIS Scientific Name"].isin(extra_stocks)
-
-                    extra_stocks_coverage = fs[extra_stocks_mask & fs_area_mask][
-                        year
-                    ].sum()
-
-                    coverage += extra_stocks_coverage
-                    extra_stocks_total += extra_stocks_coverage
-
-                    extra_stocks_added += list(extra_stocks)
-
-        # Check if tuna landings need to be added back into area
-        tuna_total = 0
-        for idx, row in sl[sl["Area"] == "Tuna"].iterrows():
-            # Make sure not to double count stocks
-            if row[sn_key] not in extra_stocks_added:
-                tuna_areas = location_to_area["Tuna"][row["Location"]]
-
-                tuna_mask = fs["ASFIS Scientific Name"] == row[sn_key]
-
-                if area in tuna_areas:
-                    tuna_coverage = fs[tuna_mask & fs_area_mask][year].sum()
-                    coverage += tuna_coverage
-                    tuna_total += tuna_coverage
-                elif area == "48,58,88":  # Check for Tunas in areas 48,58,88
-                    tuna_s_areas = [a for a in [48, 58, 88] if a in tuna_areas]
-                    if tuna_s_areas:
-                        tuna_s_mask = fs["Area"].isin(tuna_s_areas)
-                        tuna_coverage = fs[tuna_mask & tuna_s_mask][year].sum()
-                        coverage += tuna_coverage
-                        tuna_total += tuna_coverage
-
-        # Add Sharks and Deep Sea landings to FAO Area from which they are reported
-        if not shark_area_landings.empty:
-            if area == "48,58,88":
-                shark_area_mask = shark_area_landings["Area"].isin([48, 58, 88])
-            else:
-                shark_area_mask = shark_area_landings["Area"] == area
-
-            if tier:
-                if tier == "Missing":
-                    tier_mask = shark_area_landings["Tier"].isna()
-                else:
-                    tier_mask = shark_area_landings["Tier"] == tier
-            else:
-                tier_mask = pd.Series(True, index=shark_area_landings.index)
-
-            shark_landings = shark_area_landings[shark_area_mask & tier_mask][
-                "Stock Landings 2021"
-            ].sum()
-
-            coverage += shark_landings
-
-        # Add salmon to Area 67
-        if area == 67 and "Salmon" in sl["Area"].unique():
-            salmon_coverage = sl[(sl["Area"] == "Salmon")][landings_key].sum()
-            coverage += salmon_coverage
-
-        # Calculate area's total landings
-        total_area_mask = (
-            fs["Area"].isin([48, 58, 88]) if area == "48,58,88" else fs["Area"] == area
-        )
-        total_landings = fs[total_area_mask][year].sum()
-
-        # Add to global total
-        if "Global" not in percent_coverage:
-            percent_coverage["Global"] = {}
-            percent_coverage["Global"]["Coverage"] = coverage
-            percent_coverage["Global"]["Total Landings"] = total_landings
-        else:
-            percent_coverage["Global"]["Coverage"] += coverage
-            percent_coverage["Global"]["Total Landings"] += total_landings
-
-        percent_coverage[area] = coverage / total_landings * 100
-
-    percent_coverage["Global"] = (
-        percent_coverage["Global"]["Coverage"]
-        / percent_coverage["Global"]["Total Landings"]
-        * 100
-    )
-    return pd.DataFrame(
-        percent_coverage.items(), columns=["Area", f"Coverage (%) {assessment}"]
-    )
+    total_cov, total_area_l = 0, 0
+    
+    pc_dict = {}
+    
+    for area in stock_landings["Area"].unique():
+        tier_mask = stock_landings["Tier"] == tier if tier else pd.Series(True, index=stock_landings.index)
+        
+        area_mask = stock_landings["Area"] == area
+        
+        cov = stock_landings[tier_mask & area_mask][landings_key].sum()
+        
+        area_l = compute_total_area_landings(area, fishstat, species_landings, special_groups=special_groups, isscaap_to_remove=isscaap_to_remove, special_groups_to_convert=["Sharks"])[year]
+        
+        pc_dict[area] = 100 * cov / area_l 
+                
+        total_cov += cov
+        total_area_l += area_l
+        
+    pc_dict["Global"] = 100 * total_cov / total_area_l
+    
+    col_name = f"Coverage (%) {assessment}" if assessment else "Coverage (%)"
+    
+    pc = pd.DataFrame(pc_dict, index=[col_name]).T.reset_index(names="Area")
+    
+    return pc
 
 
 def compute_percent_coverage_tiers(
     stock_landings,
+    species_landings,
     fishstat,
-    areas,
     isscaap_to_remove,
-    extra_stocks_map={},
-    location_to_area={},
-    shark_area_landings=pd.DataFrame(),
 ):
-    tiers = [1, 2, 3]
-    pc_tiers = []
-    for tier in tiers:
-        pc_tier = compute_percent_coverage(
-            stock_landings,
-            fishstat,
-            areas,
-            isscaap_to_remove,
-            tier=tier,
-            extra_stocks_map=extra_stocks_map,
-            location_to_area=location_to_area,
-            shark_area_landings=shark_area_landings,
-        )
-        rename_col = f"Tier {tier}"
-        pc_tier = pc_tier.rename(columns={"Coverage (%) Update": rename_col})
-        pc_tiers.append(pc_tier)
+    pc_tiers = pd.DataFrame()
 
-    pc_update = reduce(lambda left, right: pd.merge(left, right, on="Area"), pc_tiers)
+    for tier in [1,2,3]:
+        pc_tier = compute_percent_coverage(stock_landings, species_landings, fishstat, isscaap_to_remove, tier=tier)
+        
+        pc_tier = pc_tier.rename(columns={"Coverage (%)": f"Coverage (%) Tier {tier}"})
+        
+        if pc_tiers.empty:
+            pc_tiers = pc_tier.copy()
+        else:
+            pc_tiers = pd.merge(pc_tiers, pc_tier, on="Area")
+            
+    pc_tiers = pc_tiers.set_index("Area")
 
-    pc_update["Total"] = pc_update["Tier 1"] + pc_update["Tier 2"] + pc_update["Tier 3"]
-
-    tuples = [("", "Area")] + [
-        ("Coverage (%)", col) for col in pc_update.columns if col != "Area"
-    ]
-    pc_update.columns = pd.MultiIndex.from_tuples(tuples)
-
-    return pc_update
+    pc_tiers["Coverage (%) Total"] = pc_tiers.sum(axis=1)
+            
+    return pc_tiers.reset_index()
 
 
 def compare_weighted_percentages(previous, update, coverage_comparison):
