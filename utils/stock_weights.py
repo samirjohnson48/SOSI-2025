@@ -55,8 +55,29 @@ def retrieve_31_37_81_weights(file_path, sheet_names=["Area31Jeremy", "37", "81"
             axis=1,
         )
 
+        # Update locations for Area 37
+        if sheet == "37":
+            data = data.reset_index(names="Original Line No.")
+            data["Original Line No."] += 2
+
+            loc_changes = [
+                (14, "Algeria 1"),
+                (17, "Algeria 2"),
+                (19, "Algeria 3"),
+                (27, "Levant Sea 1"),
+                (28, "Levant Sea 2"),
+            ]
+
+            for change in loc_changes:
+                mask = data["Original Line No."] == change[0]
+                data.loc[mask, "Location"] = change[1]
+
+            data = data.drop(columns="Original Line No.")
+
         # Need to do specific extraction for area 81
         if sheet == "81":
+            data["Weight 1"] = data["Weight 1"].apply(lambda x: 1 if x == "<1" else x)
+
             df = data[
                 data["Weight 1"].apply(
                     lambda x: isinstance(x, str) and "notes" in x.lower()
@@ -119,7 +140,11 @@ def retrieve_31_37_81_weights(file_path, sheet_names=["Area31Jeremy", "37", "81"
             data["Weight 1"] = data["Weight 1 Update"].fillna(data["Weight 1"])
             data = data.drop(columns="Weight 1 Update")
 
-        data = data[["Area", "ASFIS Scientific Name", "Location", "Weight 1"]]
+        data = data[["Area", "ASFIS Scientific Name", "Location", "Weight 1"]].dropna(
+            subset="ASFIS Scientific Name"
+        )
+
+        data["Weight 1"] = data["Weight 1"].fillna(1)
 
         combined_data = pd.concat([combined_data, data])
 

@@ -522,6 +522,16 @@ def main():
     wp_top10_fp = os.path.join(output_dir, "weight_percentages_top10species.xlsx")
     wp_top10.to_excel(wp_top10_fp)
     round_excel_file(wp_top10_fp)
+    
+    fao_areas = sorted(list(set(numerical_areas) - set([48,58,88]))) + ["48,58,88"]
+    top_species_areas = compute_top_species_by_area(fao_areas, stock_assessments, stock_landings, fishstat)
+    top_species_areas_fp = os.path.join(output_dir, "top10_assessed_species_by_area.xlsx")
+    
+    with pd.ExcelWriter(top_species_areas_fp) as writer:
+        for area, top_species in top_species_areas.items():
+            label_s = "" if isinstance(area, int) else "s"
+            top_species.to_excel(writer, sheet_name=f"Area{label_s} {area}")
+        
 
     print(f"All files saved to {output_dir}")
 
