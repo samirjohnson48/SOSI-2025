@@ -374,13 +374,18 @@ def main():
     seals_mask = stock_landings["ISSCAAP Code"] == 63
     stock_landings = stock_landings[~seals_mask]
     
+    # Define dfs for landings to add back into areas
+    # TODO: Save a file instead with stocks and corresponding FAO Areas
+    weights = pd.read_excel(os.path.join(clean_data_dir, "stock_weights.xlsx"))
+    sg_add_back = compute_sg_long(stock_landings, fishstat, species_landings, weights, location_to_area)
+    
     # Compute percent coverage
     pc = compute_percent_coverage(
         stock_landings,
         species_landings,
         fishstat,
         isscaap_to_remove,
-        assessment="Update"
+        sg_add_back=sg_add_back
     )
 
     # Compute percent coverage across tiers
@@ -389,29 +394,30 @@ def main():
         species_landings,
         fishstat,
         isscaap_to_remove,
+        sg_add_back=sg_add_back
     )
     # Retrieve SOFIA with landings
     sofia_landings = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
 
-    # Combine areas 48,58,88
-    sofia_southern_mask = sofia_landings["Area"].isin([48, 58, 88])
-    sofia_landings.loc[sofia_southern_mask, "Area"] = "48,58,88"
-
     # Add ISSCAAP Code to SOFIA data
-    sofia_landings["ISSCAAP Code"] = sofia_landings["Proxy"].map(scientific_to_isscaap)
-
+    sofia_landings["ISSCAAP Code"] = sofia_landings["ASFIS Scientific Name"].map(scientific_to_isscaap)
+    
+    sofia_tuna = sg_add_back[0].copy()
+    sofia_tuna = sofia_tuna.rename(columns={"Stock Landings 2021": 2021})
+    sofia_sg_add_back = [sofia_tuna]
+    
     # Compute percent coverage for SOFIA data
     pc_sofia = compute_percent_coverage(
         sofia_landings,
         species_landings,
         fishstat,
         isscaap_to_remove,
-        assessment="Previous",
-        landings_key=2021
+        landings_key=2021,
+        sg_add_back=sofia_sg_add_back
     )
 
     # Compute and save the comparison of percent coverage
-    pc_comp = pd.merge(pc_sofia, pc, on="Area", how="right")
+    pc_comp = pd.merge(pc_sofia, pc, on="Area", how="right", suffixes=(" Previous", " Updated"))
 
     pc_comp_fp = os.path.join(output_dir, "percent_coverage_comparison.xlsx")
     pc_comp.to_excel(pc_comp_fp, index=False)

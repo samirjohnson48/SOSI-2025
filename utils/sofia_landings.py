@@ -6,6 +6,7 @@ These functions are implemented in ./main/sofia_landings.py
 
 import pandas as pd
 import numpy as np
+import re
 import os
 
 
@@ -29,7 +30,7 @@ def convert_status_to_list(status):
     return [status]
 
 
-def get_proxy_name(sn, scientific_names):
+def get_scientific_name(sn, scientific_names):
     if pd.isna(sn):
         return sn
     if sn in scientific_names:
@@ -43,6 +44,36 @@ def get_proxy_name(sn, scientific_names):
         return sn.split(" ")[0] + " spp"
 
     return np.nan
+
+
+def convert_common_to_sn(name, name_to_sn):
+    if not isinstance(name, str):
+        return
+
+    if ", " not in name:
+        sn = name_to_sn.get(name)
+
+        if sn:
+            return sn
+
+    # Return multiple scientific names combined
+    # Common names with ', ' are enclosed in single quotes ''
+    names_list = re.findall(r"'(.*?)'", name)
+
+    for n in names_list:
+        name = name.replace(f"'{n}'", "")
+
+    names_list += [s for s in name.split(", ") if s]
+
+    sns = []
+
+    for n in names_list:
+        sn = name_to_sn.get(n)
+
+        if sn:
+            sns.append(sn)
+
+    return ", ".join(sns)
 
 
 def normalize_landings(sofia, years, key=["Area", "ASFIS Scientific Name"]):

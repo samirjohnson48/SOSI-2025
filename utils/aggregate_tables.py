@@ -9,6 +9,8 @@ from tqdm import tqdm
 from openpyxl import load_workbook
 from functools import reduce
 
+from utils.species_landings import compute_species_landings
+
 
 def round_excel_file(filename, decimal_places=2, lt_one=False):
     try:
@@ -235,8 +237,12 @@ def compute_summary_of_stocks(data, group="Tier"):
 def compute_summary_area_by_tier(data):
     tier_summaries = {}
 
-    for tier in [1, 2, 3]:
-        tier_mask = data["Tier"] == tier
+    for tier in [1, 2, 3, "Total"]:
+        tier_mask = (
+            data["Tier"] == tier
+            if tier != "Total"
+            else pd.Series(True, index=data.index)
+        )
 
         df = data[tier_mask].copy()
 
@@ -258,7 +264,8 @@ def compute_summary_area_by_tier(data):
 
         comb = pd.merge(sos, sbn, left_index=True, right_index=True)
 
-        tier_summaries[f"Tier {tier}"] = comb
+        key = f"Tier {tier}" if tier != "Total" else "Total"
+        tier_summaries[key] = comb
 
     return tier_summaries
 
@@ -1315,31 +1322,128 @@ def remove_isscaap_fishstat(
     return fs
 
 
+def compute_sg_long(
+    stock_landings, fishstat, species_landings, weights, location_to_area
+):
+    # Create tuna df
+    tuna_mask = stock_landings["Area"] == "Tuna"
+    tuna_df = stock_landings[tuna_mask][
+        ["ASFIS Scientific Name", "Tier", "Location"]
+    ].copy()
+
+    tuna_df["Area"] = tuna_df["Location"].map(location_to_area["Tuna"])
+
+    tuna_df = tuna_df.explode("Area")
+
+    tuna_df[2021] = tuna_df.apply(
+        compute_species_landings,
+        args=(
+            fishstat,
+            {},
+            2021,
+            2021,
+            "ASFIS Scientific Name",
+        ),
+        axis=1,
+    )
+
+    tuna_df = tuna_df.rename(columns={2021: "Stock Landings 2021"})
+    tuna_df = tuna_df[["Area", "ASFIS Scientific Name", "Tier", "Stock Landings 2021"]]
+
+    # Create salmon df
+    salmon_mask = stock_landings["Area"] == "Salmon"
+    salmon_df = stock_landings[salmon_mask].copy()
+    salmon_df.loc[:, "Area"] = 67
+    salmon_df = salmon_df.rename(columns={2021: "Stock Landings 2021"})
+    salmon_df = salmon_df[
+        ["Area", "ASFIS Scientific Name", "Tier", "Stock Landings 2021"]
+    ]
+
+    # Create sharks df
+    w_sharks_mask = weights["Area"] == "Sharks"
+    sharks_weights = weights[w_sharks_mask].copy()
+
+    sl_sharks_mask = species_landings["Area"] == "Sharks"
+    sharks_sl = species_landings[sl_sharks_mask].copy()
+
+    primary_key = ["Area", "ASFIS Scientific Name", "Location"]
+
+    sharks_comb = pd.merge(sharks_sl, sharks_weights, on=primary_key)[
+        ["ASFIS Scientific Name", "Tier", "Location", 2021, "Normalized Weight"]
+    ]
+
+    sharks_dict = {
+        "Area": [],
+        "ASFIS Scientific Name": [],
+        "Tier": [],
+        "Stock Landings 2021": [],
+    }
+
+    for idx, row in sharks_comb.iterrows():
+        if isinstance(row[2021], float):
+            area = location_to_area["Sharks"][row["Location"]][0]
+
+            sharks_dict["Area"].append(area)
+            sharks_dict["ASFIS Scientific Name"].append(row["ASFIS Scientific Name"])
+            sharks_dict["Tier"].append(row["Tier"])
+            sharks_dict["Stock Landings 2021"].append(row[2021])
+
+        elif isinstance(row[2021], str):
+            w = json.loads(row["Normalized Weight"])
+            l = json.loads(row[2021])
+
+            for area_str, landings in l.items():
+                sl = w[area_str] * landings
+                area = int(area_str)
+
+                sharks_dict["Area"].append(area)
+                sharks_dict["ASFIS Scientific Name"].append(
+                    row["ASFIS Scientific Name"]
+                )
+                sharks_dict["Tier"].append(row["Tier"])
+                sharks_dict["Stock Landings 2021"].append(sl)
+
+    sharks_df = pd.DataFrame(sharks_dict)
+
+    return [tuna_df, salmon_df, sharks_df]
+
+
 def compute_percent_coverage(
     stock_landings,
     species_landings,
     fishstat,
     isscaap_to_remove,
+    special_groups=[],
+    sg_add_back=[],
     landings_key="Stock Landings 2021",
-    special_groups=["Salmon", "Sharks", "Tuna"],
-    assessment="",
     tier=None,
     year=2021,
 ):
     total_cov, total_area_l = 0, 0
-
     pc_dict = {}
 
-    for area in stock_landings["Area"].unique():
-        tier_mask = (
-            stock_landings["Tier"] == tier
-            if tier
-            else pd.Series(True, index=stock_landings.index)
-        )
+    sl = stock_landings.copy()
 
-        area_mask = stock_landings["Area"] == area
+    fao_areas = [
+        area
+        for area in sl["Area"].unique()
+        if isinstance(area, int) or area == "48,58,88"
+    ]
 
-        cov = stock_landings[tier_mask & area_mask][landings_key].sum()
+    for area in fao_areas + special_groups:
+        tier_mask = sl["Tier"] == tier if tier else pd.Series(True, index=sl.index)
+
+        area_mask = sl["Area"] == area
+
+        cov = sl[tier_mask & area_mask][landings_key].sum()
+
+        for sg in sg_add_back:
+            sg_area_mask = sg["Area"] == area
+            sg_tier_mask = (
+                sg["Tier"] == tier if tier else pd.Series(True, index=sg.index)
+            )
+
+            cov += sg[sg_area_mask & sg_tier_mask][landings_key].sum()
 
         area_l = compute_total_area_landings(
             area,
@@ -1357,9 +1461,7 @@ def compute_percent_coverage(
 
     pc_dict["Global"] = 100 * total_cov / total_area_l
 
-    col_name = f"Coverage (%) {assessment}" if assessment else "Coverage (%)"
-
-    pc = pd.DataFrame(pc_dict, index=[col_name]).T.reset_index(names="Area")
+    pc = pd.DataFrame(pc_dict, index=["Coverage (%)"]).T.reset_index(names="Area")
 
     return pc
 
@@ -1369,12 +1471,20 @@ def compute_percent_coverage_tiers(
     species_landings,
     fishstat,
     isscaap_to_remove,
+    special_groups=[],
+    sg_add_back=[],
 ):
     pc_tiers = pd.DataFrame()
 
     for tier in [1, 2, 3]:
         pc_tier = compute_percent_coverage(
-            stock_landings, species_landings, fishstat, isscaap_to_remove, tier=tier
+            stock_landings,
+            species_landings,
+            fishstat,
+            isscaap_to_remove,
+            tier=tier,
+            special_groups=special_groups,
+            sg_add_back=sg_add_back,
         )
 
         pc_tier = pc_tier.rename(columns={"Coverage (%)": f"Coverage (%) Tier {tier}"})
@@ -1414,35 +1524,7 @@ def compare_weighted_percentages(previous, update, coverage_comparison):
 
     comparison_df = comparison_df.reset_index().rename(columns={"index": "Area"})
 
-    coverage_comparison = coverage_comparison[sorted(coverage_comparison.columns)]
-    coverage_comparison.columns = pd.MultiIndex.from_tuples(
-        [
-            ("Area", ""),
-            ("Previous SoSI Categories", "Coverage (%)"),
-            ("Updated SoSI Categories", "Coverage (%)"),
-        ]
-    )
-
-    merged_df = pd.merge(comparison_df, coverage_comparison, on=["Area"], how="inner")
-    merged_df = merged_df[
-        [
-            ("Area", ""),
-            ("Updated SoSI Categories", "Coverage (%)"),
-            ("Updated SoSI Categories", "U (%)"),
-            ("Updated SoSI Categories", "MSF (%)"),
-            ("Updated SoSI Categories", "O (%)"),
-            ("Updated SoSI Categories", "Sustainable (%)"),
-            ("Updated SoSI Categories", "Unsustainable (%)"),
-            ("Previous SoSI Categories", "Coverage (%)"),
-            ("Previous SoSI Categories", "U (%)"),
-            ("Previous SoSI Categories", "MSF (%)"),
-            ("Previous SoSI Categories", "O (%)"),
-            ("Previous SoSI Categories", "Sustainable (%)"),
-            ("Previous SoSI Categories", "Unsustainable (%)"),
-        ]
-    ]
-
-    return merged_df.set_index("Area")
+    return comparison_df.set_index("Area")
 
 
 def compute_species_weighted_percentages(stock_landings, species_list):
