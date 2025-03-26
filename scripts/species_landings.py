@@ -74,36 +74,14 @@ def main():
     species_landings[years] = species_landings.progress_apply(
         compute_species_landings, args=(fishstat, location_to_area), axis=1
     )
+    
+    # Substitute landings for certain stocks
+    subs = [
+        [47, ["Sardinella aurita", "Sardinella maderensis"], ["Sardinella spp"]],
+        [21, ["Sebastes mentella, Sebastes fasciatus"], ["Sebastes spp"]],
+    ]
+    species_landings = substitute_landings(species_landings, fishstat, subs, years)
 
-    # Use Sardinella spp landings for Sardinella aurita and Sardinella maderensis in Area 47
-    # Split the landings evenly across these two stocks
-    sardinella_spp_mask = fishstat["ASFIS Scientific Name"] == "Sardinella spp"
-    sardinella_landings = fishstat[sardinella_spp_mask & (fishstat["Area"] == 47)][
-        years
-    ].sum()
-
-    sardinella_mask = species_landings["ASFIS Scientific Name"].apply(
-        lambda x: "Sardinella" in x
-    )
-    area_47_mask = species_landings["Area"] == 47
-    n_sardinella = sum(sardinella_mask & area_47_mask)
-
-    species_landings.loc[sardinella_mask & area_47_mask, years] = (
-        sardinella_landings / n_sardinella
-    ).values
-
-    # Use Sebastes spp landings for Sebastes mentella, Sebastes fasciatus in Area 21
-    sebastes_spp_mask = fishstat["ASFIS Scientific Name"] == "Sebastes spp"
-    sebastes_area_mask = fishstat["Area"] == 21
-    sebastes_landings = fishstat[sebastes_spp_mask & sebastes_area_mask][years].sum()
-
-    sebastes_mask = (
-        species_landings["ASFIS Scientific Name"]
-        == "Sebastes mentella, Sebastes fasciatus"
-    )
-    area_21_mask = species_landings["Area"] == 21
-
-    species_landings.loc[sebastes_mask & area_21_mask, years] = sebastes_landings.values
     print("Species landings computed")
 
     # Save stocks with species landings

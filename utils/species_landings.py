@@ -80,3 +80,24 @@ def compute_species_landings(
             return cap_series
 
     return fishstat[area_mask & sn_mask][years].sum()
+
+def substitute_landings(species_landings, fishstat, subs, years):
+    sl = species_landings.copy()
+    
+    for sub in subs:
+        area = sub[0]
+        stocks = sub[1]
+        sub_stocks = sub[2]
+        n_stocks = len(stocks)
+        
+        sl_area_mask = sl["Area"] == area
+        sl_stocks_mask = sl["ASFIS Scientific Name"].isin(stocks)
+        
+        fs_area_mask = fishstat["Area"] == area
+        fs_stocks_mask = fishstat["ASFIS Scientific Name"].isin(sub_stocks)
+        
+        landings = fishstat[fs_area_mask & fs_stocks_mask][years].sum() / n_stocks
+        
+        sl.loc[sl_area_mask & sl_stocks_mask, years] = landings.values
+        
+    return sl
