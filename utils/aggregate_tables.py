@@ -567,12 +567,16 @@ def compute_appendix_landings(
         "Status": "first",
         "Tier": "first",
         "ASFIS Name": "first",
-        "ISSCAAP Code": "first"
+        "ISSCAAP Code": "first",
     }
-    for year in range(year_start, year_end+1):
+    for year in range(year_start, year_end + 1):
         agg_dict[year] = "sum"
-    
-    sl = species_landings.groupby(["Area", "ASFIS Scientific Name", "Location"]).agg(agg_dict).reset_index()
+
+    sl = (
+        species_landings.groupby(["Area", "ASFIS Scientific Name", "Location"])
+        .agg(agg_dict)
+        .reset_index()
+    )
 
     # Group the Status and Uncertainty by tier
     def aggregate_status_by_tier(group, status_vals=["U", "M", "O"]):
@@ -1425,11 +1429,15 @@ def compute_percent_coverage(
 ):
     total_cov, total_area_l = 0, 0
     pc_dict = {}
-    
+
     areas = stock_landings["FAO Area"].unique()
 
     for area in areas:
-        tier_mask = stock_landings["Tier"] == tier if tier else pd.Series(True, index=stock_landings.index)
+        tier_mask = (
+            stock_landings["Tier"] == tier
+            if tier
+            else pd.Series(True, index=stock_landings.index)
+        )
 
         area_mask = stock_landings["FAO Area"] == area
 
@@ -1442,14 +1450,14 @@ def compute_percent_coverage(
             isscaap_to_remove=isscaap_to_remove,
             special_groups=[],
         )[year]
-        
+
         pc_dict[area] = 100 * cov / area_l
 
         total_cov += cov
         total_area_l += area_l
 
     pc_dict["Global"] = 100 * total_cov / total_area_l
-    
+
     pc = pd.DataFrame(pc_dict, index=["Coverage (%)"]).T.reset_index(names="Area")
 
     return pc

@@ -249,7 +249,9 @@ def compute_weights(group):
 
 
 def validate_normalization(
-    weights, group_key=["FAO Area", "ASFIS Scientific Name"], weight_key="Normalized Weight"
+    weights,
+    group_key=["FAO Area", "ASFIS Scientific Name"],
+    weight_key="Normalized Weight",
 ):
     for group_name, group in weights.groupby(group_key):
         assert np.isclose(

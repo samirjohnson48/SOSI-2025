@@ -114,7 +114,7 @@ def main():
     # Retrieve location_to_area map
     with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
         location_to_area = json.load(file)
-        
+
     special_groups = ["48,58,88", "Salmon", "Sharks", "Tuna"]
     weights = expand_sg_stocks(weights, special_groups, location_to_area)
 
@@ -150,20 +150,16 @@ def main():
     #     ]
     #     .progress_apply(compute_weights)
     #     .reset_index(level=[0, 1], drop=True)
-    # )    
-            
+    # )
+
     weights["Normalized Weight"] = (
-        weights.groupby(["FAO Area", "ASFIS Scientific Name"])[
-            ["Weight 1", "Weight 2"]
-        ]
+        weights.groupby(["FAO Area", "ASFIS Scientific Name"])[["Weight 1", "Weight 2"]]
         .progress_apply(compute_weights)
         .reset_index(level=[0, 1], drop=True)
     )
-    
+
     # Validate weight normalization
-    validate_normalization(
-        weights, group_key=["FAO Area", "ASFIS Scientific Name"]
-    )
+    validate_normalization(weights, group_key=["FAO Area", "ASFIS Scientific Name"])
 
     # weights = weights.drop(columns="Area Specific")
 
@@ -185,7 +181,7 @@ def main():
     file_path = os.path.join(output_dir, "stock_weights.xlsx")
     print(f"Saving stocks with weights to {file_path}")
     weights.to_excel(file_path, index=False)
-    
+
 
 if __name__ == "__main__":
     main()

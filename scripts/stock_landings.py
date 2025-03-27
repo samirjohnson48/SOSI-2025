@@ -30,7 +30,7 @@ def main():
     # Retrieve the weights
     weights = pd.read_excel(os.path.join(output_dir, "stock_weights.xlsx"))
     weights = weights.drop(columns="Area")
-    
+
     # Merge the two dataframes
     stock_landings = pd.merge(
         species_landings,
@@ -136,19 +136,15 @@ def main():
     stock_landings_long.to_excel(
         os.path.join(output_dir, "stock_landings_fao_areas.xlsx"), index=False
     )
-        
-        
+
     # Save landings grouping special group stocks
-    stock_landings_grouped = stock_landings_long.groupby(["Area", "ASFIS Scientific Name", "Location"]).agg(
-        {
-            "Proxy Species": "first",
-            "Stock Landings 2021": "sum"
-        }
-    ).reset_index()
-    
-    stock_landings_grouped.to_excel(
-        os.path.join(output_dir, "stock_landings.xlsx")
+    stock_landings_grouped = (
+        stock_landings_long.groupby(["Area", "ASFIS Scientific Name", "Location"])
+        .agg({"Proxy Species": "first", "Stock Landings 2021": "sum"})
+        .reset_index()
     )
+
+    stock_landings_grouped.to_excel(os.path.join(output_dir, "stock_landings.xlsx"))
 
 
 if __name__ == "__main__":

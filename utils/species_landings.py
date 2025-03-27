@@ -27,35 +27,36 @@ def format_fishstat(fishstat, code_to_scientific=[], year_start=1950, year_end=2
 
     return fishstat
 
+
 def expand_sg_stocks(species_landings, special_groups, location_to_area):
     sl = species_landings.copy()
-    
+
     def retrieve_areas(row, lta=location_to_area):
         area = row["Area"]
-        
+
         if area not in special_groups:
             return [area]
-        
+
         loc = row["Location"]
-        
+
         try:
             areas = lta[area].get(loc, [])
-            
+
             if not areas:
-                print(f"Location {loc} not found in location_to_area map under Area {area}.")
-            
+                print(
+                    f"Location {loc} not found in location_to_area map under Area {area}."
+                )
+
             return areas
         except KeyError:
             msg = f"Special group {area} not found in location_to_area map"
-            
+
             raise KeyError(msg)
-                
-    sl["FAO Area"] = sl[["Area", "Location"]].apply(
-        retrieve_areas, axis=1
-    )
-    
+
+    sl["FAO Area"] = sl[["Area", "Location"]].apply(retrieve_areas, axis=1)
+
     sl = sl.explode("FAO Area").reset_index(drop=True)
-    
+
     return sl
 
 
@@ -78,30 +79,31 @@ def compute_species_landings(
         sn_mask = fishstat["ASFIS Scientific Name"].isin(scientific_names)
     else:
         sn_mask = fishstat["ASFIS Scientific Name"] == scientific_name
-        
+
     # If no matching scientific names, return missing values
     if sum(sn_mask) == 0:
         return pd.Series([np.nan] * len(years), index=years)
 
     return fishstat[area_mask & sn_mask][years].sum()
 
+
 def substitute_landings(species_landings, fishstat, subs, years):
     sl = species_landings.copy()
-    
+
     for sub in subs:
         area = sub[0]
         stocks = sub[1]
         sub_stocks = sub[2]
         n_stocks = len(stocks)
-        
+
         sl_area_mask = sl["Area"] == area
         sl_stocks_mask = sl["ASFIS Scientific Name"].isin(stocks)
-        
+
         fs_area_mask = fishstat["Area"] == area
         fs_stocks_mask = fishstat["ASFIS Scientific Name"].isin(sub_stocks)
-        
+
         landings = fishstat[fs_area_mask & fs_stocks_mask][years].sum() / n_stocks
-        
+
         sl.loc[sl_area_mask & sl_stocks_mask, years] = landings.values
-        
+
     return sl

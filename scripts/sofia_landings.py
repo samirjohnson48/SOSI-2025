@@ -8,7 +8,11 @@ import json
 from tqdm import tqdm
 
 from utils.sofia_landings import *
-from utils.species_landings import format_fishstat, expand_sg_stocks, compute_species_landings
+from utils.species_landings import (
+    format_fishstat,
+    expand_sg_stocks,
+    compute_species_landings,
+)
 from utils.stock_assessments import get_asfis_mappings
 
 
@@ -61,18 +65,20 @@ def main():
         os.path.join(input_dir, "updated_assessment_overview.xlsx"), sheet_name="Tuna"
     )
     sofia_tunas["Area"] = "Tuna"
-    
+
     # Assign common names
     mappings = get_asfis_mappings(input_dir, "ASFIS_sp_2024.csv")
     sn_to_name = mappings["ASFIS Scientific Name to ASFIS Name"]
     sofia_tunas["ASFIS Name"] = sofia_tunas["ASFIS Scientific Name"].map(sn_to_name)
-    
+
     # Update missing locations so we can find areas from location to area map
     tuna_mask1 = sofia_tunas["ASFIS Scientific Name"] == "Thunnus orientalis"
     tuna_mask2 = sofia_tunas["ASFIS Scientific Name"] == "Thunnus maccoyii"
     sofia_tunas.loc[tuna_mask1, "Location"] = "Pacific"
     sofia_tunas.loc[tuna_mask2, "Location"] = "Southern"
-    sofia_tunas = sofia_tunas[["Area", "ASFIS Scientific Name", "ASFIS Name", "Location", "Status"]]
+    sofia_tunas = sofia_tunas[
+        ["Area", "ASFIS Scientific Name", "ASFIS Name", "Location", "Status"]
+    ]
 
     sofia = pd.concat([sofia, sofia_tunas]).reset_index(drop=True)
 
@@ -176,9 +182,11 @@ def main():
     )
 
     sofia = sofia.drop(columns="ASFIS Scientific Name 2")
-    
+
     # Fill NaN values with common name so it can be used as part of primary key
-    sofia["ASFIS Scientific Name"] = sofia["ASFIS Scientific Name"].fillna(sofia["ASFIS Name"])
+    sofia["ASFIS Scientific Name"] = sofia["ASFIS Scientific Name"].fillna(
+        sofia["ASFIS Name"]
+    )
 
     # Remove tunas reported in FAO Areas
     # Retrieve location to area map for tunas
@@ -192,9 +200,9 @@ def main():
         tuna_mask = sofia["ASFIS Scientific Name"] == tuna_row["ASFIS Scientific Name"]
 
         sofia = sofia[~(areas_mask & tuna_mask)]
-        
+
     # Expand the Tunas across their FAO Areas
-    
+
     sofia = expand_sg_stocks(sofia, ["Tuna"], location_to_area)
 
     # Retrieve fishstat data to assign landings
@@ -220,7 +228,7 @@ def main():
         ),
         axis=1,
     )
-    
+
     # We do not have weighting for SOFIA stocks, so we normalized landings
     # by number of species of same name within a given area
     sofia_landings_fao_areas = normalize_landings(sofia, years)
@@ -230,19 +238,23 @@ def main():
     tuna_list = sofia_tunas["ASFIS Scientific Name"].unique()
     tuna_mask = sofia_landings_fao_areas["ASFIS Scientific Name"].isin(tuna_list)
     sofia_landings_fao_areas.loc[southern_mask & ~tuna_mask, "Area"] = "48,58,88"
-    
+
     sofia_landings_fao_areas.to_excel(
         os.path.join(output_dir, "sofia_landings_fao_areas.xlsx"), index=False
     )
-    
+
     # Aggregate landings based on Area, not FAO Area
     agg_dict = {
         "ASFIS Name": "first",
     }
     for year in years:
         agg_dict[year] = "sum"
-    
-    sofia_landings = sofia_landings_fao_areas.groupby(["Area", "ASFIS Scientific Name", "Status"]).agg(agg_dict).reset_index()
+
+    sofia_landings = (
+        sofia_landings_fao_areas.groupby(["Area", "ASFIS Scientific Name", "Status"])
+        .agg(agg_dict)
+        .reset_index()
+    )
 
     sofia_landings.to_excel(
         os.path.join(output_dir, "sofia_landings.xlsx"), index=False
