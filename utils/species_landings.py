@@ -27,25 +27,46 @@ def format_fishstat(fishstat, code_to_scientific=[], year_start=1950, year_end=2
 
     return fishstat
 
+def expand_sg_stocks(species_landings, special_groups, location_to_area):
+    sl = species_landings.copy()
+    
+    def retrieve_areas(row, lta=location_to_area):
+        area = row["Area"]
+        
+        if area not in special_groups:
+            return [area]
+        
+        loc = row["Location"]
+        
+        try:
+            areas = lta[area].get(loc, [])
+            
+            if not areas:
+                print(f"Location {loc} not found in location_to_area map under Area {area}.")
+            
+            return areas
+        except KeyError:
+            msg = f"Special group {area} not found in location_to_area map"
+            
+            raise KeyError(msg)
+                
+    sl["FAO Area"] = sl[["Area", "Location"]].apply(
+        retrieve_areas, axis=1
+    )
+    
+    sl = sl.explode("FAO Area").reset_index(drop=True)
+    
+    return sl
+
 
 def compute_species_landings(
     row, fishstat, area_map, year_start=1950, year_end=2021, key="ASFIS Scientific Name"
 ):
-    scientific_name, area, loc = row[key], row["Area"], row["Location"]
+    scientific_name, area = row[key], row["FAO Area"]
     years = list(range(year_start, year_end + 1))
 
-    if row["Area"] == "48,58,88":
-        area_str = loc.split(".")[0]
-        areas = [int(area_str)] if area_str.isdigit() else [48, 58, 88]
-    elif row["Area"] == "Salmon":
-        areas = [67]
-    elif isinstance(area, int):
-        areas = [area]
-    else:
-        # Handle the categorical areas separately
-        areas = area_map[area][loc]
-
-    area_mask = fishstat["Area"].isin(areas)
+    # area_mask = fishstat["Area"].isin(areas)
+    area_mask = fishstat["Area"] == area
 
     # Create mask for scientific name
     # Handle species listed by commas
@@ -57,27 +78,10 @@ def compute_species_landings(
         sn_mask = fishstat["ASFIS Scientific Name"].isin(scientific_names)
     else:
         sn_mask = fishstat["ASFIS Scientific Name"] == scientific_name
-
+        
+    # If no matching scientific names, return missing values
     if sum(sn_mask) == 0:
-        # If no matching scientific names, return missing values
         return pd.Series([np.nan] * len(years), index=years)
-
-    # Return dictionary of Area to landings for sharks/deep sea covering more than one FAO area
-    if row["Area"] == "Sharks":
-        if len(areas) == 1:
-            area_mask = fishstat["Area"] == areas[0]
-            return fishstat[area_mask & sn_mask][years].sum()
-        else:
-            cap_series = pd.Series(index=years, dtype=object)
-
-            for year in years:
-                cap_dict = {}
-                for area in areas:
-                    area_mask_sg = fishstat["Area"] == area
-                    cap_dict[area] = fishstat[area_mask_sg & sn_mask][year].sum()
-                cap_series[year] = json.dumps(cap_dict)
-
-            return cap_series
 
     return fishstat[area_mask & sn_mask][years].sum()
 

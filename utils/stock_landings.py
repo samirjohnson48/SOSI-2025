@@ -17,23 +17,7 @@ def compute_num_stocks(stock_landings, group_key=["Area", "ASFIS Scientific Name
 def compute_landings(
     row, species_landings="Species Landings 2021", weight="Normalized Weight"
 ):
-    if row["Area"] == "Tuna":
-        return row[species_landings]
-    elif row["Area"] in ["Sharks", "Deep Sea"]:
-        if isinstance(row[weight], (int, float)):
-            return row[species_landings] * row[weight]
-        elif isinstance(row[weight], str):
-            # Dictionary saved as JSON string in pandas dataframe
-            weight_dict = json.loads(row[weight])
-            sl_dict = json.loads(row[species_landings])
-
-            landings = 0
-
-            for area, w in weight_dict.items():
-                landings += sl_dict.get(area, 0) * w
-
-            return landings
-    elif not pd.isna(row[species_landings]) and not pd.isna(row[weight]):
+    if not pd.isna(row[species_landings]) and not pd.isna(row[weight]):
         return row[species_landings] * row[weight]
     elif row["Num Stocks"] == 1 and not pd.isna(row[species_landings]):
         return row[species_landings]

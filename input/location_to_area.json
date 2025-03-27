@@ -211,5 +211,288 @@
         "NPFC: N Pacific": [
             61
         ]
+    },
+    "Salmon": {
+        "Auke Creek": [
+            67
+        ],
+        "Berners River": [
+            67
+        ],
+        "British Columbia": [
+            67
+        ],
+        "Columbia River Basin: Lower River Hatchery Fall": [
+            67
+        ],
+        "Columbia River Basin: Lower River Hatchery Spring": [
+            67
+        ],
+        "Columbia River Basin: Mid-River Bright Hatchery Fall": [
+            67
+        ],
+        "Columbia River Basin: North Lewis River Fall": [
+            67
+        ],
+        "Columbia River Basin: Snake River Fall": [
+            67
+        ],
+        "Columbia River Basin: Snake River Spring/Summer": [
+            67
+        ],
+        "Columbia River Basin: Spring Creek Hatchery Fall": [
+            67
+        ],
+        "Columbia River Basin: Upper River Bright Fall": [
+            67
+        ],
+        "Columbia River Basin: Upper River Spring": [
+            67
+        ],
+        "Columbia River Basin: Upper River Summer": [
+            67
+        ],
+        "Columbia River Basin: Upper Willamette Spring": [
+            67
+        ],
+        "Eastern North Pacific Far North Migrating": [
+            67
+        ],
+        "Fraser": [
+            67
+        ],
+        "Fraser (Early Stuart)": [
+            67
+        ],
+        "Fraser (Early Summer)": [
+            67
+        ],
+        "Fraser (Late)": [
+            67
+        ],
+        "Fraser (Summer)": [
+            67
+        ],
+        "Fraser River": [
+            67
+        ],
+        "Hugh Smith Lake": [
+            67
+        ],
+        "Inner South Coast": [
+            67
+        ],
+        "Interior Fraser": [
+            67
+        ],
+        "Nass": [
+            67
+        ],
+        "North Coast": [
+            67
+        ],
+        "Northern California Coast: California Coastal": [
+            67
+        ],
+        "Northern California Coast: Klamath River Fall": [
+            67
+        ],
+        "Okanagan": [
+            67
+        ],
+        "Oregon Coast: Central and Northern Oregon": [
+            67
+        ],
+        "Oregon Coast: Southern Oregon": [
+            67
+        ],
+        "Oregon Production Index Area: Central California Coast": [
+            67
+        ],
+        "Oregon Production Index Area: Columbia River Early Hatchery": [
+            67
+        ],
+        "Oregon Production Index Area: Columbia River Late Hatchery": [
+            67
+        ],
+        "Oregon Production Index Area: Lower Columbia Natural": [
+            67
+        ],
+        "Oregon Production Index Area: Oregon Coast Hatchery": [
+            67
+        ],
+        "Oregon Production Index Area: Oregon Coast Natural": [
+            67
+        ],
+        "Oregon Production Index Area: Southern Oregon/Northern California Coast": [
+            67
+        ],
+        "Puget Sound": [
+            67
+        ],
+        "Puget Sound: Cedar River Summer/Fall": [
+            67
+        ],
+        "Puget Sound: Eastern Strait of Juan de Fuca Summer/Fall": [
+            67
+        ],
+        "Puget Sound: Green River Summer/Fall": [
+            67
+        ],
+        "Puget Sound: Hood Canal": [
+            67
+        ],
+        "Puget Sound: Mid Hood Canal Summer/Fall": [
+            67
+        ],
+        "Puget Sound: Nisqually River Summer/Fall": [
+            67
+        ],
+        "Puget Sound: Nooksack Spring Early": [
+            67
+        ],
+        "Puget Sound: Puyallup Summer/Fall": [
+            67
+        ],
+        "Puget Sound: Skagit": [
+            67
+        ],
+        "Puget Sound: Skagit Spring": [
+            67
+        ],
+        "Puget Sound: Skagit Summer/Fall": [
+            67
+        ],
+        "Puget Sound: Snohomish": [
+            67
+        ],
+        "Puget Sound: Snohomish Summer/Fall": [
+            67
+        ],
+        "Puget Sound: South Puget Sound Hatchery": [
+            67
+        ],
+        "Puget Sound: Stillaguamish": [
+            67
+        ],
+        "Puget Sound: Stillaguamish Summer/Fall": [
+            67
+        ],
+        "Puget Sound: White River Spring": [
+            67
+        ],
+        "Skeena": [
+            67
+        ],
+        "Skeena-Nass": [
+            67
+        ],
+        "Stikine": [
+            67
+        ],
+        "Vancouver Island": [
+            67
+        ],
+        "WCVI barkley": [
+            67
+        ],
+        "Washington Coast: Grays Harbor": [
+            67
+        ],
+        "Washington Coast: Grays Harbor Fall": [
+            67
+        ],
+        "Washington Coast: Grays Harbor Spring": [
+            67
+        ],
+        "Washington Coast: Hoh": [
+            67
+        ],
+        "Washington Coast: Hoh Fall": [
+            67
+        ],
+        "Washington Coast: Hoh Spring/Summer": [
+            67
+        ],
+        "Washington Coast: Hoko Summer/Fall": [
+            67
+        ],
+        "Washington Coast: Queets": [
+            67
+        ],
+        "Washington Coast: Queets Fall": [
+            67
+        ],
+        "Washington Coast: Queets Spring/Summer": [
+            67
+        ],
+        "Washington Coast: Quillayute Fall": [
+            67
+        ],
+        "Washington Coast: Quillayute Spring/Summer": [
+            67
+        ],
+        "Washington Coast: Quillayute Summer Hatchery": [
+            67
+        ],
+        "Washington Coast: Quinault Fall Hatchery": [
+            67
+        ],
+        "Washington Coast: Quinault Hatchery": [
+            67
+        ],
+        "Washington Coast: Strait of Juan de Fuca": [
+            67
+        ],
+        "Washington Coast: Willapa Bay Fall Hatchery": [
+            67
+        ],
+        "Washington Coast: Willapa Bay Fall Natural": [
+            67
+        ],
+        "Washington Coast: Willapa Bay Hatchery": [
+            67
+        ],
+        "Washington Coast: Willapa Bay Natural": [
+            67
+        ],
+        "Yukon": [
+            67
+        ]
+    },
+    "48,58,88": {
+        "48": [
+            48
+        ],
+        "48.3": [
+            48
+        ],
+        "48.4": [
+            48
+        ],
+        "48.6": [
+            48
+        ],
+        "58.4.1": [
+            58
+        ],
+        "58.4.2": [
+            58
+        ],
+        "58.5.1": [
+            58
+        ],
+        "58.5.2": [
+            58
+        ],
+        "58.6": [
+            58
+        ],
+        "88.1": [
+            88
+        ],
+        "88.2": [
+            88
+        ]
     }
 }

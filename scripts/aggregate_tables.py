@@ -331,10 +331,6 @@ def main():
         iso3_to_name,
     )
     
-    cols = []
-    for tier in [1,2,3]:
-        cols += [f"Tier {tier} Status", f"Tier {tier} Uncertainty"]
-    
     # Save appendix landings files
     # By decade
     appendix_decs_fp = os.path.join(output_dir, "appendix_landings_decades.xlsx")
@@ -366,54 +362,53 @@ def main():
     print("Computing tables based on stock landings...")
     # Retrieve stock landings
     stock_landings = pd.read_excel(os.path.join(clean_data_dir, "stock_landings.xlsx"))
+    
+    # Retrieve stock landings across FAO Areas
+    stock_landings_fao_areas = pd.read_excel(os.path.join(clean_data_dir, "stock_landings_fao_areas.xlsx"))
 
     # Merge with stock assessments for Status, Tier, etc.
     stock_landings = pd.merge(stock_landings, stock_assessments, on=primary_key)
+    stock_landings_fao_areas = pd.merge(stock_landings_fao_areas, stock_assessments, on=primary_key)
 
     # Take out seals from stock landing aggregations since they are reported by number
-    seals_mask = stock_landings["ISSCAAP Code"] == 63
-    stock_landings = stock_landings[~seals_mask]
+    seals_mask1 = stock_landings["ISSCAAP Code"] == 63
+    seals_mask2 = stock_landings_fao_areas["ISSCAAP Code"] == 63
+    stock_landings = stock_landings[~seals_mask1]
+    stock_landings_fao_areas = stock_landings_fao_areas[~seals_mask2]
     
-    # Define dfs for landings to add back into areas
-    # TODO: Save a file instead with stocks and corresponding FAO Areas
-    weights = pd.read_excel(os.path.join(clean_data_dir, "stock_weights.xlsx"))
-    sg_add_back = compute_sg_long(stock_landings, fishstat, species_landings, weights, location_to_area)
+    # Group 48,58,88 together for percent coverage
+    southern_mask = stock_landings_fao_areas["FAO Area"].isin([48,58,88])
+    stock_landings_fao_areas["FAO Area"] = stock_landings_fao_areas["FAO Area"].astype(object)
+    stock_landings_fao_areas.loc[southern_mask, "FAO Area"] = "48,58,88"
     
     # Compute percent coverage
     pc = compute_percent_coverage(
-        stock_landings,
+        stock_landings_fao_areas,
         species_landings,
         fishstat,
         isscaap_to_remove,
-        sg_add_back=sg_add_back
     )
 
     # Compute percent coverage across tiers
     pc_tiers = compute_percent_coverage_tiers(
-        stock_landings,
+        stock_landings_fao_areas,
         species_landings,
         fishstat,
         isscaap_to_remove,
-        sg_add_back=sg_add_back
     )
     # Retrieve SOFIA with landings
-    sofia_landings = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
+    sofia_landings_fao_areas = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings_fao_areas.xlsx"))
 
     # Add ISSCAAP Code to SOFIA data
-    sofia_landings["ISSCAAP Code"] = sofia_landings["ASFIS Scientific Name"].map(scientific_to_isscaap)
-    
-    sofia_tuna = sg_add_back[0].copy()
-    sofia_tuna = sofia_tuna.rename(columns={"Stock Landings 2021": 2021})
-    sofia_sg_add_back = [sofia_tuna]
+    # sofia_landings["ISSCAAP Code"] = sofia_landings["ASFIS Scientific Name"].map(scientific_to_isscaap)
     
     # Compute percent coverage for SOFIA data
     pc_sofia = compute_percent_coverage(
-        sofia_landings,
+        sofia_landings_fao_areas,
         species_landings,
         fishstat,
         isscaap_to_remove,
         landings_key=2021,
-        sg_add_back=sofia_sg_add_back
     )
 
     # Compute and save the comparison of percent coverage
@@ -433,12 +428,10 @@ def main():
     
     # Compute weighted percentages for SOFIA
     # Get assessed stocks from SOFIA data
-    sofia_landings_assessed = sofia_landings.rename(columns={"Status": "Status Old"})
-    sofia_landings_assessed["Status"] = sofia_landings_assessed["Status Old"].apply(
-        lambda x: {"F": "M"}.get(x, x)
-    )
-    sofia_assessed_mask = sofia_landings_assessed["Status"].isin(["U", "M", "O"])
-    sofia_landings_assessed = sofia_landings_assessed[sofia_assessed_mask]
+    sofia_landings = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
+    
+    sofia_assessed_mask = sofia_landings["Status"].isin(["U", "M", "O"])
+    sofia_landings_assessed = sofia_landings[sofia_assessed_mask].copy()
 
     sofia_landings_assessed = sofia_landings_assessed.rename(
         columns={2021: "Stock Landings 2021"}
@@ -450,7 +443,7 @@ def main():
     wp_sofia = compute_weighted_percentages(sofia_landings_assessed)
 
     # Compare the weighted percentages for the two assessments
-    wp_comp = compare_weighted_percentages(wp_sofia, wp_area, pc_comp)
+    wp_comp = compare_weighted_percentages(wp_sofia, wp_area)
 
     # Save the updated weighted percentages w/Tuna area separate
     wp_area_fp = os.path.join(output_dir, "status_by_landings_area.xlsx")

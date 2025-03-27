@@ -76,7 +76,7 @@ def convert_common_to_sn(name, name_to_sn):
     return ", ".join(sns)
 
 
-def normalize_landings(sofia, years, key=["Area", "ASFIS Scientific Name"]):
+def normalize_landings(sofia, years, key=["FAO Area", "ASFIS Scientific Name"]):
     sofia["n"] = sofia.groupby(key)[key[0]].transform("count")
 
     sofia[years] = sofia[years].div(sofia["n"], axis=0)

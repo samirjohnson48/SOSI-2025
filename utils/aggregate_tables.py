@@ -563,10 +563,16 @@ def compute_appendix_landings(
 ):
     # Convert Shark species landings from dictionary back to total number
     # Exclude landings from sharks in FAO areas
-
-    sl = convert_sg_landings_long(
-        "Sharks", species_landings, year_start=year_start, year_end=year_end
-    )
+    agg_dict = {
+        "Status": "first",
+        "Tier": "first",
+        "ASFIS Name": "first",
+        "ISSCAAP Code": "first"
+    }
+    for year in range(year_start, year_end+1):
+        agg_dict[year] = "sum"
+    
+    sl = species_landings.groupby(["Area", "ASFIS Scientific Name", "Location"]).agg(agg_dict).reset_index()
 
     # Group the Status and Uncertainty by tier
     def aggregate_status_by_tier(group, status_vals=["U", "M", "O"]):
@@ -813,7 +819,7 @@ def compute_appendix_landings(
                 fishstat,
                 species_landings,
                 isscaap_to_remove=isscaap_to_remove,
-                special_groups_to_convert=["Sharks"],
+                # special_groups_to_convert=["Sharks"],
             )
             / 1e3
         )
@@ -1413,54 +1419,37 @@ def compute_percent_coverage(
     species_landings,
     fishstat,
     isscaap_to_remove,
-    special_groups=[],
-    sg_add_back=[],
     landings_key="Stock Landings 2021",
     tier=None,
     year=2021,
 ):
     total_cov, total_area_l = 0, 0
     pc_dict = {}
+    
+    areas = stock_landings["FAO Area"].unique()
 
-    sl = stock_landings.copy()
+    for area in areas:
+        tier_mask = stock_landings["Tier"] == tier if tier else pd.Series(True, index=stock_landings.index)
 
-    fao_areas = [
-        area
-        for area in sl["Area"].unique()
-        if isinstance(area, int) or area == "48,58,88"
-    ]
+        area_mask = stock_landings["FAO Area"] == area
 
-    for area in fao_areas + special_groups:
-        tier_mask = sl["Tier"] == tier if tier else pd.Series(True, index=sl.index)
-
-        area_mask = sl["Area"] == area
-
-        cov = sl[tier_mask & area_mask][landings_key].sum()
-
-        for sg in sg_add_back:
-            sg_area_mask = sg["Area"] == area
-            sg_tier_mask = (
-                sg["Tier"] == tier if tier else pd.Series(True, index=sg.index)
-            )
-
-            cov += sg[sg_area_mask & sg_tier_mask][landings_key].sum()
+        cov = stock_landings[tier_mask & area_mask][landings_key].sum()
 
         area_l = compute_total_area_landings(
             area,
             fishstat,
             species_landings,
-            special_groups=special_groups,
             isscaap_to_remove=isscaap_to_remove,
-            special_groups_to_convert=["Sharks"],
+            special_groups=[],
         )[year]
-
+        
         pc_dict[area] = 100 * cov / area_l
 
         total_cov += cov
         total_area_l += area_l
 
     pc_dict["Global"] = 100 * total_cov / total_area_l
-
+    
     pc = pd.DataFrame(pc_dict, index=["Coverage (%)"]).T.reset_index(names="Area")
 
     return pc
@@ -1471,8 +1460,6 @@ def compute_percent_coverage_tiers(
     species_landings,
     fishstat,
     isscaap_to_remove,
-    special_groups=[],
-    sg_add_back=[],
 ):
     pc_tiers = pd.DataFrame()
 
@@ -1483,8 +1470,6 @@ def compute_percent_coverage_tiers(
             fishstat,
             isscaap_to_remove,
             tier=tier,
-            special_groups=special_groups,
-            sg_add_back=sg_add_back,
         )
 
         pc_tier = pc_tier.rename(columns={"Coverage (%)": f"Coverage (%) Tier {tier}"})
@@ -1501,7 +1486,7 @@ def compute_percent_coverage_tiers(
     return pc_tiers.reset_index()
 
 
-def compare_weighted_percentages(previous, update, coverage_comparison):
+def compare_weighted_percentages(previous, update):
     cols = [
         ("Weighted % by Landings", "U (%)"),
         ("Weighted % by Landings", "MSF (%)"),

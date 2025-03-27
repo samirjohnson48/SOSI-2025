@@ -29,20 +29,20 @@ def main():
 
     # Retrieve the weights
     weights = pd.read_excel(os.path.join(output_dir, "stock_weights.xlsx"))
-
+    weights = weights.drop(columns="Area")
+    
     # Merge the two dataframes
     stock_landings = pd.merge(
         species_landings,
         weights,
-        on=["Area", "ASFIS Scientific Name", "Location"],
-        how="inner",
-        suffixes=("", "_x"),
+        on=["FAO Area", "ASFIS Scientific Name", "Location"],
     )
     stock_landings = stock_landings.rename(columns={2021: "Species Landings 2021"})
     cols_to_keep = [
-        "Area",
+        "FAO Area",
         "ASFIS Scientific Name",
         "Location",
+        "Area",
         "Species Landings 2021",
         "Normalized Weight",
     ]
@@ -82,11 +82,6 @@ def main():
         "Proxy Species Landings",
     ]
     proxy_landings = proxy_landings[proxy_cols]
-
-    # Fix NaN scientific names
-    sn_mask = proxy_landings["ASFIS Scientific Name"].isna()
-    loc_mask = proxy_landings["Location"] == "DEMS/Crust(Cameroon)"
-    proxy_landings.loc[sn_mask & loc_mask, "ASFIS Scientific Name"] = "Coastal shrimps"
 
     # Use the proxy landings
     stock_landings = use_proxy_landings(stock_landings, proxy_landings)
@@ -131,14 +126,28 @@ def main():
     # Save assigned landings to output file
     cols_to_save = [
         "Area",
+        "FAO Area",
         "ASFIS Scientific Name",
         "Location",
         "Proxy Species",
         "Stock Landings 2021",
     ]
-    stock_landings = stock_landings[cols_to_save]
-    stock_landings.to_excel(
-        os.path.join(output_dir, "stock_landings.xlsx"), index=False
+    stock_landings_long = stock_landings[cols_to_save].copy()
+    stock_landings_long.to_excel(
+        os.path.join(output_dir, "stock_landings_fao_areas.xlsx"), index=False
+    )
+        
+        
+    # Save landings grouping special group stocks
+    stock_landings_grouped = stock_landings_long.groupby(["Area", "ASFIS Scientific Name", "Location"]).agg(
+        {
+            "Proxy Species": "first",
+            "Stock Landings 2021": "sum"
+        }
+    ).reset_index()
+    
+    stock_landings_grouped.to_excel(
+        os.path.join(output_dir, "stock_landings.xlsx")
     )
 
 

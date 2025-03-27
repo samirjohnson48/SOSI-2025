@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from utils.stock_weights import *
 from utils.stock_assessments import fix_nan_location
+from utils.species_landings import expand_sg_stocks
 
 
 def main():
@@ -113,107 +114,78 @@ def main():
     # Retrieve location_to_area map
     with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
         location_to_area = json.load(file)
+        
+    special_groups = ["48,58,88", "Salmon", "Sharks", "Tuna"]
+    weights = expand_sg_stocks(weights, special_groups, location_to_area)
 
-    weights["Area Specific"] = weights[["Area", "Location"]].apply(
-        specify_area, args=(location_to_area,), axis=1
-    )
-
-    # Separate out Shark stocks into their FAO Areas
-    # Then weights are normalized over these species groups to not double count landings
-
-    sharks_mask = weights["Area"] == "Sharks"
-    weights_sharks = weights[sharks_mask].copy()
-    weights_rest = weights[~(sharks_mask)].copy()
-
-    weights_sharks["Area Specific"] = weights_sharks["Area Specific"].apply(
-        lambda areas: [int(a) for a in areas.split(", ")]
-    )
-
-    weights_sharks = weights_sharks.explode("Area Specific")
-
-    # # Specify weights for Deep Sea stocks based on corresponding stock from Complete_data_weighting.xlsx
-    # ds_sn_mask1 = weights_ds["ASFIS Scientific Name"] == "Pandalus borealis"
-    # w_sn_mask1 = weights_21_27_67["ASFIS Scientific Name"] == "Pandalus borealis"
-    # ds_loc_mask1 = weights_ds["Location"] == "Division 3LNO"
-    # w_loc_mask1 = (weights_21_27_67["Location"] == "SFA 7") & (
-    #     weights_21_27_67["Area"] == 21
-    # )
-    # weights_ds.loc[ds_sn_mask1 & ds_loc_mask1, "Weight 2"] = weights_21_27_67.loc[
-    #     w_sn_mask1 & w_loc_mask1, "Weight 2"
-    # ].values
-
-    # ds_sn_mask2 = weights_ds["ASFIS Scientific Name"] == "Chionoecetes opilio"
-    # w_sn_mask2 = weights_21_27_67["ASFIS Scientific Name"] == "Chionoecetes opilio"
-    # ds_loc_mask2 = weights_ds["Location"] == "Grand Bank 3LNO"
-    # w_loc_mask2 = (
-    #     weights_21_27_67["Location"]
-    #     == "Newfoundland and Labrador (Divisions 2HJ3KLNOP4R)"
-    # ) & (weights_21_27_67["Area"] == 21)
-    # weights_ds.loc[ds_sn_mask2 & ds_loc_mask2, "Weight 2"] = (
-    #     weights_21_27_67.loc[w_sn_mask2 & w_loc_mask2, "Weight 2"].values / 2
+    # weights["Area Specific"] = weights[["Area", "Location"]].apply(
+    #     specify_area, args=(location_to_area,), axis=1
     # )
 
-    # # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2022/scr22-013.pdf -- Table 1, Total (catch) in 2021
-    # ds_sn_mask3 = (
-    #     weights_ds["ASFIS Scientific Name"] == "Sebastes mentella, Sebastes fasciatus"
+    # # Separate out Shark stocks into their FAO Areas
+    # # Then weights are normalized over these species groups to not double count landings
+
+    # sharks_mask = weights["Area"] == "Sharks"
+    # weights_sharks = weights[sharks_mask].copy()
+    # weights_rest = weights[~(sharks_mask)].copy()
+
+    # weights_sharks["Area Specific"] = weights_sharks["Area Specific"].apply(
+    #     lambda areas: [int(a) for a in areas.split(", ")]
     # )
-    # ds_loc_mask3 = weights_ds["Location"] == "Divisions 3LN Grand Bank"
-    # weights_ds.loc[ds_sn_mask3 & ds_loc_mask3, "Weight 2"] = 10_172
 
-    # # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2022/scr22-044.pdf -- Table 1, Total (catch) in 2021
-    # ds_loc_mask4 = weights_ds["Location"] == "Divisions 3O Grand Bank"
-    # weights_ds.loc[ds_sn_mask3 & ds_loc_mask4, "Weight 2"] = 5_577
+    # weights_sharks = weights_sharks.explode("Area Specific")
 
-    # # Ref: https://www.nafo.int/Portals/0/PDFs/sc/2021/scr21-020.pdf -- Table B4, Landings in 2020
-    # ds_sn_mask4 = weights_ds["ASFIS Scientific Name"] == "Hippoglossoides platessoides"
-    # ds_loc_mask5 = weights_ds["Location"] == "3LNO"
-    # weights_ds.loc[ds_sn_mask4 & ds_loc_mask5, "Weight 2"] = 1_175
-
-    # weights_ds
-
-    weights_exp = (
-        pd.concat([weights_rest, weights_sharks])
-        .sort_values(["Area", "ASFIS Scientific Name", "Location"])
-        .reset_index(drop=True)
-    )
+    # weights_exp = (
+    #     pd.concat([weights_rest, weights_sharks])
+    #     .sort_values(["Area", "ASFIS Scientific Name", "Location"])
+    #     .reset_index(drop=True)
+    # )
 
     # Progress bar
     tqdm.pandas()
 
-    weights_exp["Normalized Weight"] = (
-        weights_exp.groupby(["Area Specific", "ASFIS Scientific Name"])[
+    # weights_exp["Normalized Weight"] = (
+    #     weights_exp.groupby(["Area Specific", "ASFIS Scientific Name"])[
+    #         ["Weight 1", "Weight 2"]
+    #     ]
+    #     .progress_apply(compute_weights)
+    #     .reset_index(level=[0, 1], drop=True)
+    # )    
+            
+    weights["Normalized Weight"] = (
+        weights.groupby(["FAO Area", "ASFIS Scientific Name"])[
             ["Weight 1", "Weight 2"]
         ]
         .progress_apply(compute_weights)
         .reset_index(level=[0, 1], drop=True)
     )
-
+    
     # Validate weight normalization
     validate_normalization(
-        weights_exp, group_key=["Area Specific", "ASFIS Scientific Name"]
+        weights, group_key=["FAO Area", "ASFIS Scientific Name"]
     )
 
     # weights = weights.drop(columns="Area Specific")
 
-    def aggregate_weight(group, area_col="Area Specific", nw_col="Normalized Weight"):
-        if len(group) == 1:
-            return group[nw_col].iloc[0]
-        else:
-            return json.dumps(dict(zip(group[area_col], group[nw_col])))
+    # def aggregate_weight(group, area_col="Area Specific", nw_col="Normalized Weight"):
+    #     if len(group) == 1:
+    #         return group[nw_col].iloc[0]
+    #     else:
+    #         return json.dumps(dict(zip(group[area_col], group[nw_col])))
 
-    weights_final = (
-        weights_exp.groupby(["Area", "ASFIS Scientific Name", "Location"])[
-            ["Area Specific", "Normalized Weight"]
-        ]
-        .apply(aggregate_weight)
-        .reset_index(name="Normalized Weight")
-    )
+    # weights_final = (
+    #     weights_exp.groupby(["Area", "ASFIS Scientific Name", "Location"])[
+    #         ["Area Specific", "Normalized Weight"]
+    #     ]
+    #     .apply(aggregate_weight)
+    #     .reset_index(name="Normalized Weight")
+    # )
 
     # Save assigned weights to output file
     file_path = os.path.join(output_dir, "stock_weights.xlsx")
     print(f"Saving stocks with weights to {file_path}")
-    weights_final.to_excel(file_path, index=False)
-
+    weights.to_excel(file_path, index=False)
+    
 
 if __name__ == "__main__":
     main()

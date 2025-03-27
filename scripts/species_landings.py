@@ -61,19 +61,27 @@ def main():
     # Retrieve map of location to FAO major fishing area for Tuna, Sharks, and Deep Sea stocks
     with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
         location_to_area = json.load(file)
+        
+    # Expand the Special Group stocks across their FAO Areas
+    special_groups = ["48,58,88", "Salmon", "Sharks", "Tuna"]
+    
+    species_landings = expand_sg_stocks(species_landings, special_groups, location_to_area)
 
     # Compute species landings for all assessed stocks
     year_start, year_end = 1950, 2021
     years = list(range(year_start, year_end + 1))
-
-    for year in years:
-        species_landings[year] = pd.Series(dtype=object)
+    
+    pk = ["FAO Area", "ASFIS Scientific Name"]
+    
+    sl_reduced = species_landings.drop_duplicates(pk)[pk].copy()
 
     print("Computing species landings...")
     tqdm.pandas()
-    species_landings[years] = species_landings.progress_apply(
+    sl_reduced[years] = sl_reduced.progress_apply(
         compute_species_landings, args=(fishstat, location_to_area), axis=1
     )
+    
+    species_landings = pd.merge(species_landings, sl_reduced, on=pk)
     
     # Substitute landings for certain stocks
     subs = [

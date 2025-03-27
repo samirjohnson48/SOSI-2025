@@ -200,30 +200,12 @@ def merge_weights(
     return merge
 
 
-def specify_area(row, location_to_area):
-    area, loc = row["Area"], row["Location"]
-
-    if area in location_to_area:
-        areas = location_to_area[area].get(loc, area)
-        return ", ".join([str(a) for a in areas])
-    elif area == "48,58,88":
-        try:
-            sp_area_str = loc.split(".")[0]
-            return int(sp_area_str)
-        except ValueError:
-            message = (
-                f"Could not cast {sp_area_str} to int for location {loc} in area {area}"
-            )
-            raise ValueError(message)
-    else:
-        return area
-
-
 def compute_weights(group):
     # See if weight 2 should be used
     if all(
         group["Weight 1"].apply(lambda x: isinstance(x, str) or pd.isna(x) or x == 0)
     ):
+        # If no Weight 1 or Weight 2, use uniform weighting for group
         if all(group["Weight 2"].isna()) or all(group["Weight 2"] == 0):
             return pd.Series(1 / len(group), index=group.index)
         else:
@@ -267,7 +249,7 @@ def compute_weights(group):
 
 
 def validate_normalization(
-    weights, group_key=["Area", "ASFIS Scientific Name"], weight_key="Normalized Weight"
+    weights, group_key=["FAO Area", "ASFIS Scientific Name"], weight_key="Normalized Weight"
 ):
     for group_name, group in weights.groupby(group_key):
         assert np.isclose(
