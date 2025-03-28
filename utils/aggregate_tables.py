@@ -380,28 +380,20 @@ def compute_total_area_landings(
     area,
     fishstat,
     species_landings,
-    special_groups=["Salmon", "Sharks", "Tuna"],
+    special_groups={},
     isscaap_to_remove=[],
     year_start=1950,
     year_end=2021,
-    special_groups_to_convert=[],
 ):
-    # Convert special groups with landings saved as dictionary back to numeric
-    if area in special_groups_to_convert:
-        sl = convert_sg_landings_long(area, species_landings, year_start, year_end)
-    else:
-        sl = species_landings.copy()
+    sl = species_landings.copy()
 
     # Define special groups masks to either take out special group landings from FAO Areas
     # or calculate landings for special group categories
 
     sg_masks = {}
 
-    for sg in special_groups:
+    for sg, sg_list in special_groups.items():
         sg_masks[sg] = {}
-
-        sl_mask = sl["Area"] == sg
-        sg_list = sl[sl_mask]["ASFIS Scientific Name"].unique()
 
         sg_area_mask = (
             fishstat["Area"] == 67
@@ -420,7 +412,7 @@ def compute_total_area_landings(
 
         sg_masks[sg]["sl"] = sg_mask_sl
 
-    if area in special_groups:
+    if area in special_groups.keys():
         cap = fishstat[sg_masks[area]["fishstat"]]
 
         years = list(range(year_start, year_end + 1))
@@ -497,17 +489,14 @@ def compute_total_aquaculture_landings(
     area,
     aquaculture,
     species_landings,
-    special_groups=["Salmon", "Sharks", "Tuna"],
+    special_groups={},
     isscaap_to_remove=[],
     year_start=1950,
     year_end=2021,
 ):
     sg_masks = {}
 
-    for sg in special_groups:
-        sl_mask = species_landings["Area"] == sg
-        sg_list = species_landings[sl_mask]["ASFIS Scientific Name"].unique()
-
+    for sg, sg_list in special_groups.items():
         sg_area_mask = (
             aquaculture["Area"] == 67
             if sg == "Salmon"
@@ -557,6 +546,7 @@ def compute_appendix_landings(
     scientific_names,
     location_to_area,
     iso3_to_name,
+    special_groups,
     year_start=1950,
     year_end=2021,
     last_decade_year=2010,
@@ -823,7 +813,7 @@ def compute_appendix_landings(
                 fishstat,
                 species_landings,
                 isscaap_to_remove=isscaap_to_remove,
-                # special_groups_to_convert=["Sharks"],
+                special_groups=special_groups,
             )
             / 1e3
         )
@@ -1448,7 +1438,7 @@ def compute_percent_coverage(
             fishstat,
             species_landings,
             isscaap_to_remove=isscaap_to_remove,
-            special_groups=[],
+            special_groups={},
         )[year]
 
         pc_dict[area] = 100 * cov / area_l

@@ -319,6 +319,16 @@ def main():
     # (unless they appear in assessment, then they are added back in to total area landings)
     isscaap_to_remove = [61, 62, 63, 64, 71, 72, 73, 74, 81, 82, 83, 91, 92, 93, 94]
     
+    # Define the special groups with the list of species
+    salmon_full_mask = stock_assessments_full["Area"] == "Salmon"
+    sharks_full_mask = stock_assessments_full["Area"] == "Sharks"
+    tuna_full_mask = stock_assessments_full["Area"] == "Tuna"
+    special_groups = {
+        "Salmon": stock_assessments_full[salmon_full_mask]["ASFIS Scientific Name"].unique(),
+        "Sharks": stock_assessments_full[sharks_full_mask]["ASFIS Scientific Name"].unique(),
+        "Tuna": stock_assessments_full[tuna_full_mask]["ASFIS Scientific Name"].unique()
+    }
+    
     # Compute appendix landings
     appendix_decs, appendix_years = compute_appendix_landings(
         species_landings,
@@ -329,6 +339,7 @@ def main():
         scientific_names,
         location_to_area,
         iso3_to_name,
+        special_groups
     )
     
     # Save appendix landings files

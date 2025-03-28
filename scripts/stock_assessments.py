@@ -346,7 +346,7 @@ def main():
     overview["Sharks"]["Tier"] = 1
     overview["Sharks"]["ISSCAAP Code"] = 38
     overview["Sharks"]["Status"] = overview["Sharks"]["Status"].map(
-        lambda x: x[0].upper()
+        lambda x: "X" if x == "Unknown" else x[0].upper()
     )
 
     # Correct the scientific names, common names, and/or ISSCAAP codes for the duplicated entries.
@@ -420,6 +420,7 @@ def main():
     # Create list of all stocks to remove based on being a duplicate or an erroneous stock
     # Remove based on primary key Sheet, Original Line No.
     # Provide reason for removing stock
+
     stocks_to_remove = {
         "21": [(148, "Duplicate")],
         "27": [(112, "Duplicate"), (114, "Duplicate")],

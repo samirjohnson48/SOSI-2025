@@ -89,6 +89,11 @@ def main():
     subs = [
         [47, ["Sardinella aurita", "Sardinella maderensis"], ["Sardinella spp"]],
         [21, ["Sebastes mentella, Sebastes fasciatus"], ["Sebastes spp"]],
+        [
+            34,
+            ["Penaeus notialis, Penaeus monodon, Holthuispenaeopsis atlantic"],
+            ["Penaeus spp"],
+        ],
     ]
     species_landings = substitute_landings(species_landings, fishstat, subs, years)
 
