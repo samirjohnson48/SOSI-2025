@@ -534,7 +534,7 @@ def remove_values(overview, remove_dict):
     return df_dict
 
 
-def remove_stocks(overview, stocks_to_remove):
+def remove_stocks(overview, stocks_to_remove, output_dir):
     """Removes specific stock entries from DataFrames based on line numbers.
 
     This function iterates through a dictionary of DataFrames and removes rows
@@ -553,9 +553,25 @@ def remove_stocks(overview, stocks_to_remove):
     """
     df_dict = overview.copy()
 
-    for sheet, line_nos in stocks_to_remove.items():
-        mask = ~(df_dict[sheet]["Original Line No."].isin(line_nos))
-        df_dict[sheet] = df_dict[sheet][mask]
+    stocks_removed = pd.DataFrame()
+
+    for sheet, remove_info in stocks_to_remove.items():
+        line_nos = [info[0] for info in remove_info]
+        reasons = [info[1] for info in remove_info]
+
+        mask = df_dict[sheet]["Original Line No."].isin(line_nos)
+
+        cols = ["Area", "ASFIS Scientific Name", "Location", "Tier", "Status"]
+        sr = df_dict[sheet][mask][cols].copy()
+        sr["Sheet in Base File"] = sheet
+        sr["Reason Removed"] = reasons
+        stocks_removed = pd.concat([stocks_removed, sr])
+
+        df_dict[sheet] = df_dict[sheet][~mask]
+
+    stocks_removed.to_excel(
+        os.path.join(output_dir, "stocks_removed.xlsx"), index=False
+    )
 
     return df_dict
 

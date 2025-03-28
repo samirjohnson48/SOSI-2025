@@ -44,26 +44,8 @@ def main():
     )
     base_weights = base_weights[primary_key + ["Weight 1", "Weight 2"]]
 
-    # Update location of Chanos chanos stock
-    chanos_mask = base_weights["ASFIS Scientific Name"] == "Chanos chanos"
-    base_weights.loc[chanos_mask & base_weights["Location"].isna(), "Location"] = "51"
-    # Fix NaN locations
+    # Fix NaN location
     base_weights = fix_nan_location(base_weights)
-
-    # Manually update some weights in base_weights based on MSY values
-    area_mask = base_weights["Area"] == 34
-    sns = ["Ethmalosa fimbriata", "Sardinella aurita", "Sardinella maderensis"]
-    sn_mask1 = base_weights["ASFIS Scientific Name"].isin(sns)
-    locs = ["SPN/AllZones (Mauritania, Senegal, Gambia)", "SPN/AllZones"]
-    loc_mask1 = base_weights["Location"].isin(locs)
-    base_weights.loc[area_mask & sn_mask1 & loc_mask1, "Weight 1"] = 200_000
-
-    sn_mask2 = base_weights["ASFIS Scientific Name"] == "Pagellus spp"
-    loc_mask2 = base_weights["Location"] == "South"
-    base_weights.loc[area_mask & sn_mask2 & loc_mask2, "Weight 2"] = 1
-
-    loc_mask3 = base_weights["Location"] == "Area 34"
-    base_weights.loc[area_mask & sn_mask2 & loc_mask3, "Weight 2"] = 5
 
     # File for weights in areas 21, 27, 67
     weights_21_27_67 = pd.read_excel(
@@ -118,39 +100,8 @@ def main():
     special_groups = ["48,58,88", "Salmon", "Sharks", "Tuna"]
     weights = expand_sg_stocks(weights, special_groups, location_to_area)
 
-    # weights["Area Specific"] = weights[["Area", "Location"]].apply(
-    #     specify_area, args=(location_to_area,), axis=1
-    # )
-
-    # # Separate out Shark stocks into their FAO Areas
-    # # Then weights are normalized over these species groups to not double count landings
-
-    # sharks_mask = weights["Area"] == "Sharks"
-    # weights_sharks = weights[sharks_mask].copy()
-    # weights_rest = weights[~(sharks_mask)].copy()
-
-    # weights_sharks["Area Specific"] = weights_sharks["Area Specific"].apply(
-    #     lambda areas: [int(a) for a in areas.split(", ")]
-    # )
-
-    # weights_sharks = weights_sharks.explode("Area Specific")
-
-    # weights_exp = (
-    #     pd.concat([weights_rest, weights_sharks])
-    #     .sort_values(["Area", "ASFIS Scientific Name", "Location"])
-    #     .reset_index(drop=True)
-    # )
-
     # Progress bar
     tqdm.pandas()
-
-    # weights_exp["Normalized Weight"] = (
-    #     weights_exp.groupby(["Area Specific", "ASFIS Scientific Name"])[
-    #         ["Weight 1", "Weight 2"]
-    #     ]
-    #     .progress_apply(compute_weights)
-    #     .reset_index(level=[0, 1], drop=True)
-    # )
 
     weights["Normalized Weight"] = (
         weights.groupby(["FAO Area", "ASFIS Scientific Name"])[["Weight 1", "Weight 2"]]
@@ -160,22 +111,6 @@ def main():
 
     # Validate weight normalization
     validate_normalization(weights, group_key=["FAO Area", "ASFIS Scientific Name"])
-
-    # weights = weights.drop(columns="Area Specific")
-
-    # def aggregate_weight(group, area_col="Area Specific", nw_col="Normalized Weight"):
-    #     if len(group) == 1:
-    #         return group[nw_col].iloc[0]
-    #     else:
-    #         return json.dumps(dict(zip(group[area_col], group[nw_col])))
-
-    # weights_final = (
-    #     weights_exp.groupby(["Area", "ASFIS Scientific Name", "Location"])[
-    #         ["Area Specific", "Normalized Weight"]
-    #     ]
-    #     .apply(aggregate_weight)
-    #     .reset_index(name="Normalized Weight")
-    # )
 
     # Save assigned weights to output file
     file_path = os.path.join(output_dir, "stock_weights.xlsx")

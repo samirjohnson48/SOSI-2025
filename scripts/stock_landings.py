@@ -144,7 +144,9 @@ def main():
         .reset_index()
     )
 
-    stock_landings_grouped.to_excel(os.path.join(output_dir, "stock_landings.xlsx"))
+    stock_landings_grouped.to_excel(
+        os.path.join(output_dir, "stock_landings.xlsx"), index=False
+    )
 
 
 if __name__ == "__main__":

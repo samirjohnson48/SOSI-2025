@@ -85,7 +85,7 @@ def main():
         "21": (0, 0, 171),
         "27": (0, 0, 206),
         "Area31Jeremy": (0, 0, 118),
-        "Area34Luca": (0, 0, 152),
+        "Area34Luca": (0, 0, 150),
         "37": (0, 0, 128),
         "41": (0, 0, 81),
         "47": (0, 0, 82),
@@ -127,15 +127,6 @@ def main():
         "Area31Jeremy": {
             "Code": code,
             "Uncertainty (H,L,M)": unc,
-        },
-        "Area34Luca": {
-            "Scientific name": sn,
-            "Location - in online document": loc,
-            "Tier (3 levels)": tier,
-            "ISSCAAP Group Code": code,
-            "ASFIS Stocks \nCommon name (species name)": name,
-            "Uncertainty (H,L,M)": unc,
-            "Status (3 levels)": st,
         },
         "37": {
             "Scientific name": sn,
@@ -428,19 +419,28 @@ def main():
 
     # Create list of all stocks to remove based on being a duplicate or an erroneous stock
     # Remove based on primary key Sheet, Original Line No.
+    # Provide reason for removing stock
     stocks_to_remove = {
-        "21": [148],
-        "27": [112, 114],
-        "Area34Luca": [96, 109],
-        "41": [25],
-        "47": [16, 37],
-        "51fromAbwoTuna": [10, 149],
-        "61": [32],
-        "77": [86],
-        "Deep Sea": [23, 24, 44, 45, 46, 47, 56, 66],
-        "Sharks": [20, 24, 48],
+        "21": [(148, "Duplicate")],
+        "27": [(112, "Duplicate"), (114, "Duplicate")],
+        "41": [(25, "Erroneous Stock")],
+        "47": [(16, "Erroneous Stock"), (37, "Erroneous Stock")],
+        "51fromAbwoTuna": [(10, "Duplicate"), (149, "Erroneous Stock")],
+        "61": [(32, "Duplicate")],
+        "77": [(86, "Erroneous Stock")],
+        "Deep Sea": [
+            (23, "Unknown Status"),
+            (24, "Unknown Status"),
+            (44, "Duplicate"),
+            (45, "Duplicate"),
+            (46, "Duplicate"),
+            (47, "Duplicate"),
+            (56, "Erroneous Stock"),
+            (66, "Duplicate"),
+        ],
+        "Sharks": [(20, "Duplicate"), (48, "Duplicate")],
     }
-    overview = remove_stocks(overview, stocks_to_remove)
+    overview = remove_stocks(overview, stocks_to_remove, output_dir)
 
     # Change the location of certain stocks
     # Either add further specification to location (e.g. Brazil --> Brazil N),
@@ -457,22 +457,19 @@ def main():
             (137, "Subareas V, VI, XII and XIV, NAFO subareas 1, 2: Shallow stock"),
         ],
         "Area34Luca": [
-            (33, "South 3"),
-            (34, "South 4"),
-            (38, "South 1"),
-            (39, "South 4"),
-            (45, "South 3"),
-            (46, "South 4"),
-            (53, "South 3"),
-            (54, "South 4"),
-            (71, "South 3"),
-            (72, "South 4"),
-            (76, "South 3"),
-            (77, "South 4"),
-            (78, "South 1"),
-            (106, "South 3"),
-            (107, "South 4"),
-            (108, "South 1"),
+            (11, "South 1"),
+            (12, "South 4"),
+            (23, "South 3"),
+            (24, "South 4"),
+            (30, "South 3"),
+            (31, "South 4"),
+            (47, "South 3"),
+            (48, "South 4"),
+            (89, "South 3"),
+            (90, "South 4"),
+            (96, "South 3"),
+            (97, "South 4"),
+            (98, "South 1"),
         ],
         "37": [
             (14, "Algeria 1"),
