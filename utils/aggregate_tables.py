@@ -581,15 +581,16 @@ def compute_appendix_landings(
         return pd.DataFrame(tier_data)
 
     aggregated_status = (
-        sl.groupby(["Area", "ASFIS Name", "ASFIS Scientific Name"])
+        sl.groupby(["Area", "ASFIS Scientific Name"])[["Tier", "Status"]]
         .apply(aggregate_status_by_tier)
-        .reset_index()
+        .reset_index()[["Area", "ASFIS Scientific Name", "Tier", "U", "M", "O"]]
     )
 
     # Group the rest of the columns
     aggregated_species = (
-        sl.groupby(["Area", "ASFIS Name", "ASFIS Scientific Name"]).agg(
+        sl.groupby(["Area", "ASFIS Scientific Name"]).agg(
             {
+                "ASFIS Name": "first",
                 "Location": list,
                 "ISSCAAP Code": "first",
                 **{year: ["first", "sum"] for year in range(year_start, year_end + 1)},
@@ -652,7 +653,7 @@ def compute_appendix_landings(
     species_landings_dec = pd.merge(
         aggregated_species,
         aggregated_status,
-        on=["Area", "ASFIS Name", "ASFIS Scientific Name"],
+        on=["Area", "ASFIS Scientific Name"],
     )
 
     for year in range(year_start, year_end + 1):
