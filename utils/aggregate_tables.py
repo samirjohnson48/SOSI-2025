@@ -585,10 +585,10 @@ def compute_appendix_landings(
         .apply(aggregate_status_by_tier)
         .reset_index()[["Area", "ASFIS Scientific Name", "Tier", "U", "M", "O"]]
     )
-
+    
     # Group the rest of the columns
     aggregated_species = (
-        sl.groupby(["Area", "ASFIS Scientific Name"]).agg(
+        sl.groupby(["Area", "ASFIS Scientific Name"], dropna=False).agg(
             {
                 "ASFIS Name": "first",
                 "Location": list,
@@ -602,7 +602,7 @@ def compute_appendix_landings(
         f"{col[0]}_{col[1]}" if col[1] and isinstance(col[0], int) else col[0]
         for col in aggregated_species.columns
     ]
-
+    
     # Retrieve the most activate countries for each species for the given area(s)
     def most_active_countries(row, country_key="ISO3", year=2021):
         species, area = row["ASFIS Scientific Name"], row["Area"]
@@ -655,7 +655,7 @@ def compute_appendix_landings(
         aggregated_status,
         on=["Area", "ASFIS Scientific Name"],
     )
-
+    
     for year in range(year_start, year_end + 1):
         # Total landings are sum for species in "Tuna", "Sharks" areas
         # since same species correspond to different areas
@@ -698,11 +698,11 @@ def compute_appendix_landings(
     # Remove duplicate values in columns not in Tier, U, M, O
     def manually_group_df(df, check_col, group_cols):
         result = df.copy()
-        for i in range(len(df) - 1):
-            if df.loc[i, check_col] == df.loc[i + 1, check_col]:
-                result.loc[i + 1, group_cols] = np.nan
-
-        return result
+            
+        mask = df[check_col] == df[check_col].shift(-1)
+        result.loc[mask.shift(1, fill_value=False), group_cols] = np.nan
+                    
+        return result   
 
     check_col = "ASFIS Scientific Name"
     tier_cols = ["Tier", "U", "M", "O"]
@@ -715,7 +715,8 @@ def compute_appendix_landings(
     species_landings_dec = manually_group_df(
         species_landings_dec, check_col, group_cols
     )
-
+    
+    
     # Reorder columns
     columns_order = [
         "Area",
@@ -772,7 +773,7 @@ def compute_appendix_landings(
         isscaap_total["ASFIS Name"] = isscaap_total["ISSCAAP Code"].apply(
             lambda x: (
                 str(int(x)) + f" - {isscaap_code_to_name.get(x, " ")}"
-                if isinstance(x, (int, float))
+                if not pd.isna(x) and isinstance(x, (int, float))
                 else x
             )
         )
@@ -801,6 +802,16 @@ def compute_appendix_landings(
             )
             .reset_index(drop=True)
         )
+        
+        # Add missing ISSCAAP Group stocks to bottom
+        no_isscaap_mask = area_landings["ISSCAAP Code"].isna()
+        
+        if sum(no_isscaap_mask) > 0:
+            area_landings["ISSCAAP Code"] = area_landings["ISSCAAP Code"].astype(object)
+            area_landings.loc[no_isscaap_mask, "ISSCAAP Code"] = "Missing"
+            isscaap_grouped = pd.concat(
+                [isscaap_grouped, area_landings[no_isscaap_mask]]
+            )
 
         isscaap_grouped = isscaap_grouped[
             [col for col in isscaap_grouped.columns if col not in tier_cols] + tier_cols
