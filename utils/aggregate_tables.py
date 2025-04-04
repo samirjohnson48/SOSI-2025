@@ -384,6 +384,7 @@ def compute_total_area_landings(
     isscaap_to_remove=[],
     year_start=1950,
     year_end=2021,
+    area_key="Area"
 ):
     sl = species_landings.copy()
 
@@ -408,7 +409,7 @@ def compute_total_area_landings(
         sg_mask_sl = sl["ASFIS Scientific Name"].isin(sg_list)
 
         if sg == "Salmon":
-            sg_mask_sl = sg_mask_sl & sl["Area"] == 67
+            sg_mask_sl = sg_mask_sl & sl[area_key] == 67
 
         sg_masks[sg]["sl"] = sg_mask_sl
 
@@ -424,20 +425,20 @@ def compute_total_area_landings(
         if area == "Sharks":
             numeric_areas = [
                 area
-                for area in sl["Area"].unique()
+                for area in sl[area_key].unique()
                 if isinstance(area, int) or area == "48,58,88"
             ]
-            numeric_areas_mask = sl["Area"].isin(numeric_areas)
+            numeric_areas_mask = sl[area_key].isin(numeric_areas)
 
             sl_sg_cap = sl[sg_masks[area]["sl"] & numeric_areas_mask]
 
             sl_sg_cap = sl_sg_cap.drop_duplicates(
-                subset=["Area", "ASFIS Scientific Name"]
+                subset=[area_key, "ASFIS Scientific Name"]
             )
 
             total_cap -= sl_sg_cap[years].sum()
 
-            total_area = sl[sl["Area"] == area][years].sum()
+            total_area = sl[sl[area_key] == area][years].sum()
 
             total_cap = total_cap.combine(total_area, max)
 
@@ -461,7 +462,7 @@ def compute_total_area_landings(
 
     # Add special group landings back to cap which appear reported in FAO Area in assessment
 
-    sl_area_mask = sl["Area"] == area
+    sl_area_mask = sl[area_key] == area
 
     for sg in special_groups:
         sg_in_area = sl[sl_area_mask & sg_masks[sg]["sl"]]
