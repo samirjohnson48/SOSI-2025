@@ -966,70 +966,11 @@ def compute_sg_area_landings(
 
 def compute_weighted_percentages(
     stock_landings,
-    fishstat=None,
     key="Area",
-    location_to_area={},
-    add_salmon=False,
-    shark_area_landings=pd.DataFrame(),
     year=2021,
     landings_key="Stock Landings 2021",
 ):
     data = stock_landings.copy()
-
-    def add_special_group_landings(data, special_group, lta, fs=fishstat):
-        df = data.copy()
-
-        sn = "ASFIS Scientific Name"
-        sg_in_areas = pd.DataFrame()
-        for idx, row in data[data["Area"] == special_group].iterrows():
-            areas = lta[row["Location"]]
-
-            if ", " in row[sn]:
-                sn_mask = fs[sn].isin(row[sn].split(", "))
-            else:
-                sn_mask = fs[sn] == row[sn]
-
-            for area in areas:
-                sg_capture = fs[(fs["Area"] == area) & sn_mask][year].sum()
-                if sg_capture > 0:
-                    sg_in_area = pd.DataFrame(
-                        {
-                            "Area": area,
-                            "ASFIS Scientific Name": row[sn],
-                            "Status": row["Status"],
-                            landings_key: sg_capture,
-                        },
-                        index=[len(sg_in_areas)],
-                    )
-                    sg_in_areas = pd.concat([sg_in_areas, sg_in_area])
-
-        sg_in_areas = sg_in_areas.drop_duplicates(
-            subset=["Area", "ASFIS Scientific Name", "Status"]
-        )
-
-        # Add the area specific tuna rows, and remove the Tuna category
-        df = df[~(df["Area"] == special_group)]
-        df = pd.concat([df, sg_in_areas]).reset_index(drop=True)
-
-        return df
-
-    for special_group, lta in location_to_area.items():
-        # Add the special group stocks back into the areas from which they came
-        # One tuna assessment corresponds to multiple
-        # assessments added back into the area with the same status
-        # as original assessment and landing specific to that area
-        if special_group != "Deep Sea":
-            data = add_special_group_landings(data, special_group, lta, fishstat)
-
-    if add_salmon:
-        salmon_mask = data["Area"] == "Salmon"
-        data.loc[salmon_mask, "Area"] = 67
-
-    if not shark_area_landings.empty:
-        sharks_mask = data["Area"] == "Sharks"
-        data = data[~sharks_mask]
-
-        data = pd.concat([data, shark_area_landings])
 
     # Group by key and Status to aggregate data
     group = data.groupby([key, "Status"])[landings_key].sum().unstack(fill_value=0)
@@ -1061,20 +1002,6 @@ def compute_weighted_percentages(
     wp["Sustainable (%)"] = wp["M"] + wp["U"]
     wp["Unsustainable (%)"] = wp["O"]
     wp.rename(columns={"U": "U (%)", "M": "MSF (%)", "O": "O (%)"}, inplace=True)
-
-    if key == "Area" and "48,58,88" not in total_landings.index:
-        new_row = pd.DataFrame(
-            {
-                "Total Landings (Mt)": 0,
-                "Sustainable (Mt)": 0,
-                "Unsustainable (Mt)": 0,
-                "MSF (Mt)": 0,
-                "U (Mt)": 0,
-                "O (Mt)": 0,
-            },
-            index=["48,58,88"],
-        )
-        total_landings = pd.concat([total_landings, new_row])
 
     # Organize and rename columns
     total_landings = total_landings[
@@ -1497,30 +1424,15 @@ def compute_percent_coverage_tiers(
 
 
 def compare_weighted_percentages(previous, update):
-    cols = [
-        ("Weighted % by Landings", "U (%)"),
-        ("Weighted % by Landings", "MSF (%)"),
-        ("Weighted % by Landings", "O (%)"),
-        ("Weighted % by Landings", "Sustainable (%)"),
-        ("Weighted % by Landings", "Unsustainable (%)"),
-    ]
+    comp = pd.merge(update, previous, left_index=True, right_index=True, how="left")
 
-    comparison_df = pd.concat(
-        [
-            update[cols].rename(
-                columns={"Weighted % by Landings": "Updated SoSI Categories"}
-            ),
-            previous[cols].rename(
-                columns={"Weighted % by Landings": "Previous SoSI Categories"}
-            ),
-        ],
-        axis=1,
+    comp = comp.drop(columns=[col for col in comp.columns if "(Mt)" in col[1]])
+
+    comp.columns = pd.MultiIndex.from_tuples(
+        [("Updated SoSI Categories", col[1]) if "_x" in col[0] else ("Previous SoSI Categories", col[1]) for col in comp.columns]
     )
 
-    comparison_df = comparison_df.reset_index().rename(columns={"index": "Area"})
-
-    return comparison_df.set_index("Area")
-
+    return comp
 
 def compute_species_weighted_percentages(stock_landings, species_list):
     species_mask = stock_landings["ASFIS Scientific Name"].isin(species_list)
