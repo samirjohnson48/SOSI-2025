@@ -79,23 +79,23 @@
         ]
     },
     "Sharks": {
-        "Pacific Eastern Central -  Area(s) 77": [
+        "Pacific Eastern Central - Area(s) 77": [
             77
         ],
-        "Pacific Southeast -  Area(s) 87": [
+        "Pacific Southeast - Area(s) 87": [
             87
         ],
-        "Pacific Central -  Area(s) 71, 77": [
+        "Pacific Central - Area(s) 71, 77": [
             71,
             77
         ],
-        "Indian Ocean -  Area(s) 51": [
+        "Indian Ocean - Area(s) 51": [
             51
         ],
-        "Indian Ocean -  Area(s) 57": [
+        "Indian Ocean - Area(s) 57": [
             57
         ],
-        "Pacific Western Central -  Area(s) 71": [
+        "Pacific Western Central - Area(s) 71": [
             71
         ],
         "Global/All areas": [
@@ -118,54 +118,66 @@
             87,
             88
         ],
-        "Mediterranean and Black Sea -  Area(s) 37": [
+        "Mediterranean and Black Sea - Area(s) 37": [
             37
         ],
-        "Atlantic North -  Area(s) 27, 21": [
+        "Atlantic North - Area(s) 27, 21": [
             27,
             21
         ],
-        "Atlantic South -  Area(s) 41, 47": [
+        "Atlantic South - Area(s) 41, 47": [
             41,
             47
         ],
-        "Indian Ocean -  Area(s) 57, 51": [
+        "Indian Ocean - Area(s) 57, 51": [
             57,
             51
         ],
-        "Pacific North -  Area(s) 61, 67": [
+        "Pacific North - Area(s) 61, 67": [
             61,
             67
         ],
-        "Pacific South -  Area(s) 81, 87": [
+        "Pacific South - Area(s) 81, 87": [
             81,
             87
         ],
-        "Atlantic Northeast -  Area(s) 27": [
+        "Atlantic Northeast - Area(s) 27": [
             27
         ],
-        "Atlantic Northwest -  Area(s) 21": [
+        "Atlantic Northwest - Area(s) 21": [
             21
         ],
-        "Atlantic Southern -  Area(s) 41, 47": [
+        "Atlantic Southern - Area(s) 41, 47": [
             41,
             47
         ],
-        "Pacific Southern -  Area(s) 81, 87": [
+        "Pacific Southern - Area(s) 81, 87": [
             81,
             87
         ],
-        "Atlantic North -  Area(s) 34": [
+        "Atlantic North - Area(s) 34": [
             34
         ],
-        "Atlantic South -  Area(s) 27": [
+        "Atlantic South - Area(s) 27": [
             27
         ],
-        "Pacific North -  Area(s) 77": [
+        "Pacific North - Area(s) 77": [
             77
         ],
-        "Pacific South -  Area(s) 87": [
+        "Pacific South - Area(s) 87": [
             87
+        ],
+        "Atlantic North - Area(s) 21, 27, 31, 34": [
+            21,
+            27,
+            31,
+            34
+        ],
+        "Pacific North - Area(s) 61, 67, 71, 77": [
+            61,
+            67,
+            71,
+            77
         ]
     },
     "Deep Sea": {
