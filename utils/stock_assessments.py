@@ -149,9 +149,6 @@ def add_area_column(overview, sheet_to_area):
     for sheet, df in overview.items():
         area = sheet_to_area.get(sheet, sheet)
 
-        if isinstance(area, str) and area.isdigit():
-            area = int(area)
-
         new_overview[sheet] = df.copy()
         new_overview[sheet]["Area"] = area
 
@@ -640,7 +637,7 @@ def fix_nan_location(df):
     area = df["Area"].values[0]
 
     def make_location_from_area(area):
-        if isinstance(area, (int, np.int64)):
+        if isinstance(area, str) and area.isdigit() or area == "67 Other Stocks":
             area_loc = f"Area {area}"
         elif area == "48,58,88":
             area_loc = f"Areas {area}"
@@ -656,14 +653,14 @@ def fix_nan_location(df):
     return data
 
 
-def add_back_to_fao_area(loc, special_group, loc_to_area):
+def add_back_to_fao_area(loc, special_group, loc_to_area, area_to_name={}):
     areas = loc_to_area[special_group].get(loc)
 
     if isinstance(areas, list) and len(areas) == 1:
         area = areas[0]
 
         if isinstance(area, (int, float)):
-            return int(area)
+            return area_to_name.get(area, str(area))
         else:
             print(
                 f"Location {loc} in category {special_group} maps to Area {area} of wrong type ({type(area)})"
@@ -799,30 +796,30 @@ def concatenate_data(overview, cols_to_sort=[]):
 def assign_fao_area(row, location_to_area):
     area = row["Area"]
 
-    if isinstance(area, (int, float)):
+    if isinstance(area, str) and area.isdigit():
         return area
 
-    if area == "Salmon":
-        return 67
+    if isinstance(area, str) and "67" in area:
+        return "67"
 
     loc = row["Location"]
 
     if area == "48,58,88":
         south_area = loc.split(".")[0]
         if south_area.isdigit():
-            return int(south_area)
+            return south_area
 
-    areas = location_to_area[area].get(loc, np.nan)
+    areas = location_to_area[area].get(loc, "")
 
     if not isinstance(areas, list):
-        return areas
+        return str(areas)
     elif isinstance(areas, list) and len(areas) == 0:
-        return areas[0]
+        return ""
 
     return ", ".join([str(a) for a in areas])
 
 
-def validate_primary_key(df, primary_key=["Area", "ASFIS Scientific Name", "Location"]):
+def validate_primary_key(df, primary_key=["ASFIS Scientific Name", "Location"]):
     """Validates the uniqueness and non-null values of a primary key in a DataFrame.
 
     This function checks if the specified primary key columns in a DataFrame
