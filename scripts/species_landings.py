@@ -55,19 +55,15 @@ def main():
     fishstat = format_fishstat(fishstat, code_to_scientific)
 
     # Retrieve assessed stocks from clean_data folder
-    species_landings = pd.read_excel(os.path.join(output_dir, "stock_assessments.xlsx"))
-    species_landings = species_landings[["Area", "ASFIS Scientific Name", "Location"]]
-
-    # Retrieve map of location to FAO major fishing area for Tuna, Sharks, and Deep Sea stocks
-    with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
-        location_to_area = json.load(file)
-
-    # Expand the Special Group stocks across their FAO Areas
-    special_groups = ["48,58,88", "Salmon", "Sharks", "Tuna"]
-
-    species_landings = expand_sg_stocks(
-        species_landings, special_groups, location_to_area
+    stock_assessments = pd.read_excel(
+        os.path.join(output_dir, "stock_assessments.xlsx")
     )
+    species_landings = stock_assessments[
+        ["FAO Areas", "ASFIS Scientific Name", "Location"]
+    ].copy()
+
+    # Expand list of stocks across their FAO Major Fishing Area(s)
+    species_landings = explode_stocks(species_landings)
 
     # Compute species landings for all assessed stocks
     year_start, year_end = 1950, 2021
@@ -75,27 +71,34 @@ def main():
 
     pk = ["FAO Area", "ASFIS Scientific Name"]
 
-    sl_reduced = species_landings.drop_duplicates(pk)[pk].copy()
+    species_landings = species_landings.drop_duplicates(pk)[pk].copy()
 
     print("Computing species landings...")
     tqdm.pandas()
-    sl_reduced[years] = sl_reduced.progress_apply(
-        compute_species_landings, args=(fishstat, location_to_area), axis=1
+    species_landings[years] = species_landings.progress_apply(
+        compute_species_landings, args=(fishstat,), axis=1
     )
-
-    species_landings = pd.merge(species_landings, sl_reduced, on=pk)
 
     # Substitute landings for certain stocks
     subs = [
         [47, ["Sardinella aurita", "Sardinella maderensis"], ["Sardinella spp"]],
-        [21, ["Sebastes mentella, Sebastes fasciatus"], ["Sebastes spp"]],
         [
             34,
             ["Penaeus notialis, Penaeus monodon, Holthuispenaeopsis atlantic"],
             ["Penaeus spp"],
         ],
     ]
+
     species_landings = substitute_landings(species_landings, fishstat, subs, years)
+
+    # Include landings from NEI species for certain stocks
+    spl = {
+        "Mullus spp": [37, "Mullus barbatus"],
+        "Sardinella spp": [37, "Sardina pilchardus"],
+        "Trachurus spp": [37, "Trachurus mediterraneus"],
+    }
+
+    species_landings = add_species_landings(species_landings, fishstat, spl, years)
 
     print("Species landings computed")
 

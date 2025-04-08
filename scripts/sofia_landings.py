@@ -10,7 +10,7 @@ from tqdm import tqdm
 from utils.sofia_landings import *
 from utils.species_landings import (
     format_fishstat,
-    expand_sg_stocks,
+    explode_stocks,
     compute_species_landings,
 )
 from utils.stock_assessments import get_asfis_mappings
@@ -30,7 +30,7 @@ def main():
 
     # Retrieve SOFIA data
     sofia = pd.read_excel(
-        os.path.join(input_dir, "sofia2024v2Oct31woTunasFinalchcecksMarch2024.xlsx"),
+        os.path.join(input_dir, "sofia2024.xlsx"),
         sheet_name="sofia2024",
     )
 
@@ -40,11 +40,34 @@ def main():
             "Name": "ASFIS Name",
             "Species": "ASFIS Scientific Name",
             "X2021": "Status",
+            "Area": "FAO Area",
         }
     )
-    sofia = sofia[["Area", "ASFIS Scientific Name", "ASFIS Name", "Status"]]
+
+    sofia["Analysis Group"] = sofia["FAO Area"].apply(
+        lambda x: f"Area {x}" if isinstance(x, int) else x
+    )
+
+    special_groups = pd.read_excel(
+        os.path.join(input_dir, "special_groups_species.xlsx")
+    )
+
+    sg_salmon_mask = special_groups["Analysis Group"] == "Area 67 - Salmon"
+    salmon_list = special_groups[sg_salmon_mask]["ASFIS Scientific Name"].unique()
+
+    sofia_salmon_mask = sofia["ASFIS Scientific Name"].isin(salmon_list)
+    sofia_67_mask = sofia["FAO Area"] == 67
+
+    sofia.loc[sofia_67_mask & sofia_salmon_mask, "Analysis Group"] = "Area 67 - Salmon"
+    sofia.loc[sofia_67_mask & ~sofia_salmon_mask, "Analysis Group"] = (
+        "Area 67 - Other Stocks"
+    )
+
+    sofia = sofia[
+        ["Analysis Group", "FAO Area", "ASFIS Scientific Name", "ASFIS Name", "Status"]
+    ]
     sofia = sofia.dropna(subset=["ASFIS Scientific Name", "ASFIS Name"], how="all")
-    sofia = sofia[sofia["Area"] != "Tunas"]
+    sofia = sofia[sofia["Analysis Group"] != "Tunas"]
 
     # Convert the multiple statuses to individual observations
     sofia["Status List"] = sofia["Status"].apply(convert_status_to_list)
@@ -58,31 +81,14 @@ def main():
     sofia["Status"] = sofia["Status"].apply(lambda x: {"F": "M"}.get(x, x))
 
     # Add tunas separately and combine
-    # Use tuna sheet from updated_assessment_overview since it contains the locations
-    # These are same stocks listed in Tunas_HilarioISSF in sofia2024v2Oct31woTunasFinalchcecksMarch2024.xlsx
-    # (see column U2021)
-    sofia_tunas = pd.read_excel(
-        os.path.join(input_dir, "updated_assessment_overview.xlsx"), sheet_name="Tuna"
+    sofia_tunas_ = pd.read_excel(
+        os.path.join(input_dir, "sofia2024.xlsx"), sheet_name="Tuna"
     )
-    sofia_tunas["Area"] = "Tuna"
-
-    # Assign common names
-    mappings = get_asfis_mappings(input_dir, "ASFIS_sp_2024.csv")
-    sn_to_name = mappings["ASFIS Scientific Name to ASFIS Name"]
-    sofia_tunas["ASFIS Name"] = sofia_tunas["ASFIS Scientific Name"].map(sn_to_name)
-
-    # Update missing locations so we can find areas from location to area map
-    tuna_mask1 = sofia_tunas["ASFIS Scientific Name"] == "Thunnus orientalis"
-    tuna_mask2 = sofia_tunas["ASFIS Scientific Name"] == "Thunnus maccoyii"
-    sofia_tunas.loc[tuna_mask1, "Location"] = "Pacific"
-    sofia_tunas.loc[tuna_mask2, "Location"] = "Southern"
-    sofia_tunas = sofia_tunas[
-        ["Area", "ASFIS Scientific Name", "ASFIS Name", "Location", "Status"]
-    ]
-
+    sofia_tunas = explode_stocks(sofia_tunas_)
     sofia = pd.concat([sofia, sofia_tunas]).reset_index(drop=True)
 
     # Fix the scientific names and common names
+    mappings = get_asfis_mappings(input_dir, "ASFIS_sp_2024.csv")
     scientific_names = mappings["ASFIS Scientific Names"]
 
     sofia["ASFIS Scientific Name"] = sofia["ASFIS Scientific Name"].apply(
@@ -190,20 +196,14 @@ def main():
 
     # Remove tunas reported in FAO Areas
     # Retrieve location to area map for tunas
-    with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
-        location_to_area = json.load(file)
-
     for idx, tuna_row in sofia_tunas.iterrows():
-        areas = location_to_area["Tuna"][tuna_row["Location"]]
+        area = tuna_row["FAO Area"]
+        ag = f"Area {area}" if area != 67 else "Area 67 - Other Stocks"
 
-        areas_mask = sofia["Area"].isin(areas)
+        ag_mask = sofia["Analysis Group"] == ag
         tuna_mask = sofia["ASFIS Scientific Name"] == tuna_row["ASFIS Scientific Name"]
 
-        sofia = sofia[~(areas_mask & tuna_mask)]
-
-    # Expand the Tunas across their FAO Areas
-
-    sofia = expand_sg_stocks(sofia, ["Tuna"], location_to_area)
+        sofia = sofia[~(ag_mask & tuna_mask)]
 
     # Retrieve fishstat data to assign landings
     fishstat = pd.read_csv(os.path.join(input_dir, "global_capture_production.csv"))
@@ -222,7 +222,6 @@ def main():
         compute_species_landings,
         args=(
             fishstat,
-            location_to_area,
             year_start,
             year_end,
         ),
@@ -231,30 +230,13 @@ def main():
 
     # We do not have weighting for SOFIA stocks, so we normalized landings
     # by number of species of same name within a given area
-    sofia_landings_fao_areas = normalize_landings(sofia, years)
+    sofia_landings = normalize_landings(sofia, years)
 
     # Combine areas 48,58,88
-    southern_mask = sofia_landings_fao_areas["FAO Area"].isin([48, 58, 88])
+    southern_mask = sofia_landings["FAO Area"].isin([48, 58, 88])
     tuna_list = sofia_tunas["ASFIS Scientific Name"].unique()
-    tuna_mask = sofia_landings_fao_areas["ASFIS Scientific Name"].isin(tuna_list)
-    sofia_landings_fao_areas.loc[southern_mask & ~tuna_mask, "Area"] = "48,58,88"
-
-    sofia_landings_fao_areas.to_excel(
-        os.path.join(output_dir, "sofia_landings_fao_areas.xlsx"), index=False
-    )
-
-    # Aggregate landings based on Area, not FAO Area
-    agg_dict = {
-        "ASFIS Name": "first",
-    }
-    for year in years:
-        agg_dict[year] = "sum"
-
-    sofia_landings = (
-        sofia_landings_fao_areas.groupby(["Area", "ASFIS Scientific Name", "Status"])
-        .agg(agg_dict)
-        .reset_index()
-    )
+    tuna_mask = sofia_landings["ASFIS Scientific Name"].isin(tuna_list)
+    sofia_landings.loc[southern_mask & ~tuna_mask, "Analysis Group"] = "Area 48,58,88"
 
     sofia_landings.to_excel(
         os.path.join(output_dir, "sofia_landings.xlsx"), index=False

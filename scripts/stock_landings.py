@@ -29,20 +29,18 @@ def main():
 
     # Retrieve the weights
     weights = pd.read_excel(os.path.join(output_dir, "stock_weights.xlsx"))
-    weights = weights.drop(columns="Area")
 
     # Merge the two dataframes
     stock_landings = pd.merge(
         species_landings,
         weights,
-        on=["FAO Area", "ASFIS Scientific Name", "Location"],
+        on=["FAO Area", "ASFIS Scientific Name"],
     )
     stock_landings = stock_landings.rename(columns={2021: "Species Landings 2021"})
     cols_to_keep = [
         "FAO Area",
         "ASFIS Scientific Name",
         "Location",
-        "Area",
         "Species Landings 2021",
         "Normalized Weight",
     ]
@@ -58,30 +56,9 @@ def main():
 
     # Use proxy species landings for stocks with missing landings
     proxy_landings = pd.read_excel(
-        os.path.join(input_dir, "January overview - one table.xlsx"),
-        sheet_name="Stocks with Status and Tier",
+        os.path.join(input_dir, "proxy_species_for_landings.xlsx"),
     )
-    proxy_landings = proxy_landings.rename(
-        columns={
-            "AREA": "Area",
-            "scientific name w value": "Proxy Species",
-            "Stock Catch Value": "Proxy Species Landings",
-        }
-    )
-    proxy_landings = proxy_landings.dropna(
-        subset=["Proxy Species Landings", "Proxy Species"]
-    )
-    proxy_landings = proxy_landings.drop_duplicates(
-        ["Area", "ASFIS Scientific Name", "Location"]
-    )
-    proxy_cols = [
-        "Area",
-        "ASFIS Scientific Name",
-        "Location",
-        "Proxy Species",
-        "Proxy Species Landings",
-    ]
-    proxy_landings = proxy_landings[proxy_cols]
+    proxy_landings = proxy_landings.drop(columns="FAO Area")
 
     # Use the proxy landings
     stock_landings = use_proxy_landings(stock_landings, proxy_landings)
@@ -90,12 +67,12 @@ def main():
     # to the stock's ISSCAAP Code. We split the landings according to the distribution
     # of status among stocks with landings
     # We retrieve the status of stocks for the distribution
-    primary_key = ["Area", "ASFIS Scientific Name", "Location"]
+    primary_key = ["ASFIS Scientific Name", "Location"]
     stock_assessments = pd.read_excel(
         os.path.join(output_dir, "stock_assessments.xlsx")
     )
     stock_assessments = stock_assessments[
-        primary_key + ["ISSCAAP Code", "ASFIS Name", "Status"]
+        primary_key + ["ISSCAAP Code", "ASFIS Name", "Status", "Analysis Group"]
     ]
     stock_landings = pd.merge(stock_landings, stock_assessments, on=primary_key)
 
@@ -104,7 +81,7 @@ def main():
         isscaap_to_nei = json.load(file)
     isscaap_to_nei = {
         int(k): v for k, v in isscaap_to_nei.items()
-    }  # JSON saves keys are strings
+    }  # JSON saves keys as strings
 
     # Retrieve fishstat and ASFIS data for NEI landings
     fishstat = pd.read_csv(os.path.join(input_dir, "global_capture_production.csv"))
@@ -117,7 +94,7 @@ def main():
     fishstat["ASFIS Name"] = fishstat["ASFIS Scientific Name"].map(scientific_to_name)
 
     numerical_areas = [
-        area for area in stock_landings["Area"].unique() if isinstance(area, int)
+        area for area in stock_landings["FAO Area"].unique() if isinstance(area, int)
     ]
     stock_landings = compute_missing_landings(
         stock_landings, fishstat, numerical_areas, isscaap_to_nei
@@ -125,26 +102,14 @@ def main():
 
     # Save assigned landings to output file
     cols_to_save = [
-        "Area",
         "FAO Area",
         "ASFIS Scientific Name",
         "Location",
         "Proxy Species",
         "Stock Landings 2021",
     ]
-    stock_landings_long = stock_landings[cols_to_save].copy()
-    stock_landings_long.to_excel(
-        os.path.join(output_dir, "stock_landings_fao_areas.xlsx"), index=False
-    )
-
-    # Save landings grouping special group stocks
-    stock_landings_grouped = (
-        stock_landings_long.groupby(["Area", "ASFIS Scientific Name", "Location"])
-        .agg({"Proxy Species": "first", "Stock Landings 2021": "sum"})
-        .reset_index()
-    )
-
-    stock_landings_grouped.to_excel(
+    stock_landings = stock_landings[cols_to_save]
+    stock_landings.to_excel(
         os.path.join(output_dir, "stock_landings.xlsx"), index=False
     )
 

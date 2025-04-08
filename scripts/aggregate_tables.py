@@ -9,7 +9,7 @@ import json
 
 from utils.aggregate_tables import *
 from utils.stock_assessments import get_asfis_mappings, read_stock_data
-from utils.species_landings import format_fishstat
+from utils.species_landings import format_fishstat, explode_stocks
 
 
 def main():
@@ -36,19 +36,20 @@ def main():
     # -- Tables based on number --
     print("Computing tables based on number...")
     # Retrieve stock lists (assessed/unassessed and only assessed stocks)
-    stock_assessments_full = pd.read_excel(
-        os.path.join(clean_data_dir, "stock_assessments_w_unassessed.xlsx")
+    stock_reference = pd.read_excel(
+        os.path.join(input_dir, "stock_reference_list.xlsx")
     )
     stock_assessments = pd.read_excel(
         os.path.join(clean_data_dir, "stock_assessments.xlsx")
     )
 
     # Compute Status by Number grouped by Area and Tier
-    sbn_area = compute_status_by_number(stock_assessments, "Area")
+    sbn_area = compute_status_by_number(stock_assessments, "Analysis Group")
     sbn_tier = compute_status_by_number(stock_assessments, "Tier")
     
-    vc_tier_area = compute_count_for_group(stock_assessments, group_col="Area", count_col="Tier")
-
+    vc_tier_area = compute_count_for_group(stock_assessments, group_col="Analysis Group", count_col="Tier")
+    
+    # Retrieve SOFIA Status by Number
     sofia_indices = {
         "Area 21": (46, 0, 0),
         "Area27": (40, 0, 0),
@@ -81,7 +82,7 @@ def main():
     sofia_sheet_to_area["Tunas_HilarioISSF"] = "Tuna"
 
     sofia_file_path = os.path.join(
-        input_dir, "sofia2024v2Oct31woTunasFinalchcecksMarch2024.xlsx"
+        input_dir, "sofia2024.xlsx"
     )
     sbn_sofia_dict = read_stock_data(
         sofia_file_path, sofia_indices, desc="SOFIA Sheets"
@@ -89,9 +90,9 @@ def main():
 
     # Reformat SOFIA status by number
     for sheet, df in sbn_sofia_dict.items():
-        sbn_sofia_dict[sheet]["Area"] = sofia_sheet_to_area[sheet]
+        sbn_sofia_dict[sheet]["Analysis Group"] = sofia_sheet_to_area[sheet]
         sbn_sofia_dict[sheet] = df[
-            ["Area", "Overfished", "Fully Fished ", "Under fished"]
+            ["Analysis Group", "Overfished", "Fully Fished ", "Under fished"]
         ]
         sbn_sofia_dict[sheet] = sbn_sofia_dict[sheet].rename(
             columns={
@@ -120,7 +121,7 @@ def main():
             sbn_sofia = pd.concat([sbn_sofia, df])
 
     sbn_sofia = pd.concat(
-        [sbn_sofia, pd.DataFrame({"Area": "Global"}, index=[len(sbn_sofia)])]
+        [sbn_sofia, pd.DataFrame({"Analysis Group": "Global"}, index=[len(sbn_sofia)])]
     )
 
     cols_to_sum = [
@@ -131,7 +132,7 @@ def main():
         "No. of Sustainable",
         "No. of Unsustainable",
     ]
-    sbn_sofia.loc[sbn_sofia["Area"] == "Global", cols_to_sum] = (
+    sbn_sofia.loc[sbn_sofia["Analysis Group"] == "Global", cols_to_sum] = (
         sbn_sofia[cols_to_sum].sum().values
     )
 
@@ -143,7 +144,7 @@ def main():
             pct_cols.append(pct_col)
             sbn_sofia[pct_col] = (sbn_sofia[col] / sbn_sofia["No. of stocks"]) * 100
 
-    sbn_col_order = ["Area"] + cols_to_sum + pct_cols
+    sbn_col_order = ["Analysis Group"] + cols_to_sum + pct_cols
     sbn_sofia = sbn_sofia[sbn_col_order]
 
     # Compare status by number for the two methods
@@ -167,7 +168,7 @@ def main():
     vc_tier_area.to_excel(vc_tier_area_fp)
 
     # Create summary of stocks and save file
-    sos = compute_summary_of_stocks(stock_assessments_full)
+    sos = compute_summary_of_stocks(stock_reference)
     sos_fp = os.path.join(output_dir, "summary_of_stocks.xlsx")
     sos.to_excel(sos_fp)
     
@@ -182,35 +183,35 @@ def main():
     round_excel_file(summary_area_tier_fp)
 
     # Save same aggregations for individual areas
-    area_summary_dir = os.path.join(output_dir, "Area Statistics")
+    area_summary_dir = os.path.join(output_dir, "Analysis Group Statistics")
     os.makedirs(area_summary_dir, exist_ok=True)
 
-    for area in stock_assessments["Area"].unique():
-        sbna = sbn_area[sbn_area["Area"] == area]
+    for ag in stock_assessments["Analysis Group"].unique():
+        sbna = sbn_area[sbn_area["Analysis Group"] == ag]
         sbnt = compute_status_by_number(
-            stock_assessments[stock_assessments["Area"] == area], "Tier"
+            stock_assessments[stock_assessments["Analysis Group"] == ag], "Tier"
         )
         sosa = compute_summary_of_stocks(
-            stock_assessments_full[stock_assessments_full["Area"] == area]
+            stock_reference[stock_reference["Analysis Group"] == ag]
         )
-        cbn = sbn_comp[sbn_comp[("", "Area")] == area]
+        cbn = sbn_comp[sbn_comp[("", "Analysis Group")] == ag]
         
         sat = pd.DataFrame()
         for tier, summary in summary_area_tier.items():
-            if area in summary.index:
-                tier_sat = summary.loc[area].to_frame().T
+            if ag in summary.index:
+                tier_sat = summary.loc[ag].to_frame().T
                 tier_sat.index=[tier]
                 sat = pd.concat([sat, tier_sat])
 
-        area_summary_fp = os.path.join(area_summary_dir, f"area_{area}_summary.xlsx")
-
+        area_summary_fp = os.path.join(area_summary_dir, f"{ag}_summary.xlsx")
+        
         with pd.ExcelWriter(area_summary_fp) as writer:
             sbna.to_excel(writer, sheet_name="Status by Number")
             sbnt.to_excel(writer, sheet_name="Status by Tier")
             sosa.to_excel(writer, sheet_name="Summary of Stocks")
             sat.to_excel(writer, sheet_name="Summary of Area by Tier")
 
-            if area in sbn_comp[("", "Area")].unique():
+            if ag in sbn_comp[("", "Analysis Group")].unique():
                 cbn.to_excel(writer, sheet_name="Comparison by Number")
 
         round_excel_file(area_summary_fp)
@@ -228,9 +229,7 @@ def main():
     fishstat = format_fishstat(fishstat, code_to_scientific)
 
     # Only keep data from FAO major fishing areas in analysis
-    numerical_areas = [
-        area for area in stock_assessments["Area"].unique() if isinstance(area, int)
-    ] + [48, 58, 88]
+    numerical_areas = set(areas for ag in stock_assessments["Analysis Group"].unique() for areas in get_numbers_from_string(ag))
 
     fishstat_area_mask = fishstat["Area"].isin(numerical_areas)
     fishstat = fishstat[fishstat_area_mask]
@@ -272,12 +271,8 @@ def main():
     )
 
     # Add ISSCAAP Code, ASFIS Name, Status, and Uncertainty to species landings
-    primary_key = ["Area", "ASFIS Scientific Name", "Location"]
-    species_landings = pd.merge(species_landings, stock_assessments, on=primary_key)
-
-    # Take out seals since they are reported by number
-    no_seals_mask = ~(species_landings["ISSCAAP Code"] == 63)
-    species_landings = species_landings[no_seals_mask]
+    stock_assessments_ext = explode_stocks(stock_assessments)
+    species_landings = pd.merge(species_landings, stock_assessments_ext, on=["FAO Area", "ASFIS Scientific Name"])
 
     # Retrieve aquaculture landings and reformat
     aquaculture = pd.read_csv(
@@ -310,24 +305,14 @@ def main():
     iso3_to_name = dict(zip(country_codes["ISO3"], country_codes["LIST NAME"]))
     iso3_to_name["EAZ"] = "Zanzibar"
 
-    # Retrieve location to area mappings for Tuna, Deep Sea, Sharks
-    with open(os.path.join(input_dir, "location_to_area.json"), "r") as file:
-        location_to_area = json.load(file)
-
     # Define ISSCAAP Codes to remove from appendix landings,
     # and later the percent coverage calculations as well.
     # (unless they appear in assessment, then they are added back in to total area landings)
     isscaap_to_remove = [61, 62, 63, 64, 71, 72, 73, 74, 81, 82, 83, 91, 92, 93, 94]
     
     # Define the special groups with the list of species
-    salmon_full_mask = stock_assessments_full["Area"] == "Salmon"
-    sharks_full_mask = stock_assessments_full["Area"] == "Sharks"
-    tuna_full_mask = stock_assessments_full["Area"] == "Tuna"
-    special_groups = {
-        "Salmon": stock_assessments_full[salmon_full_mask]["ASFIS Scientific Name"].unique(),
-        "Sharks": stock_assessments_full[sharks_full_mask]["ASFIS Scientific Name"].unique(),
-        "Tuna": stock_assessments_full[tuna_full_mask]["ASFIS Scientific Name"].unique()
-    }
+    special_groups_df = pd.read_excel(os.path.join(input_dir, "special_groups_species.xlsx"))
+    special_groups = create_sg_dict(special_groups_df)
     
     # Compute appendix landings
     appendix_decs, appendix_years = compute_appendix_landings(
@@ -337,7 +322,6 @@ def main():
         isscaap_to_remove,
         isscaap_code_to_name,
         scientific_names,
-        location_to_area,
         iso3_to_name,
         special_groups
     )
@@ -372,20 +356,26 @@ def main():
     # -- Tables based on stock landings --
     print("Computing tables based on stock landings...")
     # Retrieve stock landings
-    stock_landings = pd.read_excel(os.path.join(clean_data_dir, "stock_landings.xlsx"))
-    
-    # Retrieve stock landings across FAO Areas
-    stock_landings_fao_areas = pd.read_excel(os.path.join(clean_data_dir, "stock_landings_fao_areas.xlsx"))
+    stock_landings_fao_areas = pd.read_excel(os.path.join(clean_data_dir, "stock_landings.xlsx"))
 
     # Merge with stock assessments for Status, Tier, etc.
-    stock_landings = pd.merge(stock_landings, stock_assessments, on=primary_key)
+    primary_key = ["ASFIS Scientific Name", "Location"]
     stock_landings_fao_areas = pd.merge(stock_landings_fao_areas, stock_assessments, on=primary_key)
-
-    # Take out seals from stock landing aggregations since they are reported by number
-    seals_mask1 = stock_landings["ISSCAAP Code"] == 63
-    seals_mask2 = stock_landings_fao_areas["ISSCAAP Code"] == 63
-    stock_landings = stock_landings[~seals_mask1]
-    stock_landings_fao_areas = stock_landings_fao_areas[~seals_mask2]
+    
+    # Group across analysis group for
+    stock_landings = (
+        stock_landings_fao_areas.groupby(["Analysis Group", "ASFIS Scientific Name", "Location"])
+        .agg({
+                "Proxy Species": "first", 
+                "ASFIS Name": "first",
+                "ISSCAAP Code": "first",
+                "Status": "first",
+                "Tier": "first",
+                "Stock Landings 2021": "sum"
+             }
+            )
+        .reset_index()
+    )
     
     # Group 48,58,88 together for percent coverage
     southern_mask = stock_landings_fao_areas["FAO Area"].isin([48,58,88])
@@ -423,7 +413,7 @@ def main():
     )
 
     # Compute and save the comparison of percent coverage
-    pc_comp = pd.merge(pc_sofia, pc, on="Area", how="right", suffixes=(" Previous", " Updated"))
+    pc_comp = pd.merge(pc_sofia, pc, on="FAO Area", how="right", suffixes=(" Previous", " Updated"))
 
     pc_comp_fp = os.path.join(output_dir, "percent_coverage_comparison.xlsx")
     pc_comp.to_excel(pc_comp_fp, index=False)
@@ -439,7 +429,23 @@ def main():
     
     # Compute weighted percentages for SOFIA
     # Get assessed stocks from SOFIA data
-    sofia_landings = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
+    sofia_landings_fao_areas = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
+    
+    # Aggregate landings based on Analysis Group
+    agg_dict = {
+        "ASFIS Name": "first",
+    }
+    
+    years = range(1950, 2022)
+    
+    for year in years:
+        agg_dict[year] = "sum"
+
+    sofia_landings = (
+        sofia_landings_fao_areas.groupby(["Analysis Group", "ASFIS Scientific Name", "Status"])
+        .agg(agg_dict)
+        .reset_index()
+    )
     
     sofia_assessed_mask = sofia_landings["Status"].isin(["U", "M", "O"])
     sofia_landings_assessed = sofia_landings[sofia_assessed_mask].copy()
@@ -448,7 +454,7 @@ def main():
         columns={2021: "Stock Landings 2021"}
     )
     sofia_landings_assessed = sofia_landings_assessed[
-        ["Area", "ASFIS Scientific Name", "Status", "Stock Landings 2021"]
+        ["Analysis Group", "ASFIS Scientific Name", "Status", "Stock Landings 2021"]
     ]
 
     wp_sofia = compute_weighted_percentages(sofia_landings_assessed)
@@ -476,7 +482,13 @@ def main():
     round_excel_file(wp_tiers_fp)
 
     # Get weighted percentages and total landings
-    wp_totl = get_weighted_percentages_and_total_landings(wp_area, appendix_decs)
+    wp_totl = get_weighted_percentages_and_total_landings(
+        wp_area, 
+        fishstat, 
+        species_landings, 
+        special_groups=special_groups,
+        isscaap_to_remove=isscaap_to_remove
+    )
 
     # Save wp w/totals w/footnote explaining why assessed landings / total landings * 100
     # per area does not correspond to the percent coverage (doesn't account for addition of Tuna landings, etc.)
@@ -497,19 +509,19 @@ def main():
     round_excel_file(wp_tiers_area_fp)
 
     # Save aggregations for areas individually
-    for area in stock_landings["Area"].unique():
-        wp = wp_area.loc[area].to_frame().T
+    for ag in stock_landings["Analysis Group"].unique():
+        wp = wp_area.loc[ag].to_frame().T
         
         wpt = compute_weighted_percentages(
-            stock_landings[stock_landings["Area"] == area], key="Tier"
+            stock_landings[stock_landings["Analysis Group"] == ag], key="Tier"
         )
-        area_lbl = f"Area {area} Total" if isinstance(area, int) or area=="48,58,88" else f"{area} Total"
+        area_lbl = f"{ag} Total"
         wpt.index = list(wpt.index[:-1]) + [area_lbl]
         
-        cbl = wp_comp.loc[area].to_frame().T if area in wp_comp.index else None
+        cbl = wp_comp.loc[ag].to_frame().T if ag in wp_comp.index else None
 
         area_summary_fp = os.path.join(
-            output_dir, os.path.join("Area Statistics", f"area_{area}_summary.xlsx")
+            output_dir, os.path.join("Analysis Group Statistics", f"{ag}_summary.xlsx")
         )
         with pd.ExcelWriter(
             area_summary_fp,
