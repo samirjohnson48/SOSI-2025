@@ -7,7 +7,7 @@ import numpy as np
 import json
 
 
-def compute_num_stocks(stock_landings, group_key=["Area", "ASFIS Scientific Name"]):
+def compute_num_stocks(stock_landings, group_key=["FAO Area", "ASFIS Scientific Name"]):
     sl = stock_landings.copy()
     sl["Num Stocks"] = sl.groupby(group_key)[group_key[0]].transform("count")
 
@@ -17,17 +17,18 @@ def compute_num_stocks(stock_landings, group_key=["Area", "ASFIS Scientific Name
 def compute_landings(
     row, species_landings="Species Landings 2021", weight="Normalized Weight"
 ):
-    if not pd.isna(row[species_landings]) and not pd.isna(row[weight]):
+    if pd.notna(row[species_landings]) and pd.notna(row[weight]):
         return row[species_landings] * row[weight]
-    elif row["Num Stocks"] == 1 and not pd.isna(row[species_landings]):
+    elif row["Num Stocks"] == 1 and pd.notna(row[species_landings]):
         return row[species_landings]
+
     return np.nan
 
 
 def use_proxy_landings(
     stock_landings,
     proxy_landings,
-    primary_key=["Area", "ASFIS Scientific Name", "Location"],
+    primary_key=["ASFIS Scientific Name", "Location"],
     landings_key="Stock Landings 2021",
     proxy_landings_key="Proxy Species Landings",
     proxy_species_key="Proxy Species",
@@ -56,7 +57,7 @@ def compute_missing_landings(
 
     for area in areas:
         # Get stock landings for the area
-        area_mask = sl["Area"] == area
+        area_mask = sl["FAO Area"] == area
         df = sl[area_mask]
         cap = fishstat[fishstat["Area"] == area]
 

@@ -384,7 +384,7 @@ def compute_total_area_landings(
     isscaap_to_remove=[],
     year_start=1950,
     year_end=2021,
-    area_key="Area"
+    area_key="Area",
 ):
     sl = species_landings.copy()
 
@@ -586,7 +586,7 @@ def compute_appendix_landings(
         .apply(aggregate_status_by_tier)
         .reset_index()[["Area", "ASFIS Scientific Name", "Tier", "U", "M", "O"]]
     )
-    
+
     # Group the rest of the columns
     aggregated_species = (
         sl.groupby(["Area", "ASFIS Scientific Name"], dropna=False).agg(
@@ -603,7 +603,7 @@ def compute_appendix_landings(
         f"{col[0]}_{col[1]}" if col[1] and isinstance(col[0], int) else col[0]
         for col in aggregated_species.columns
     ]
-    
+
     # Retrieve the most activate countries for each species for the given area(s)
     def most_active_countries(row, country_key="ISO3", year=2021):
         species, area = row["ASFIS Scientific Name"], row["Area"]
@@ -656,7 +656,7 @@ def compute_appendix_landings(
         aggregated_status,
         on=["Area", "ASFIS Scientific Name"],
     )
-    
+
     for year in range(year_start, year_end + 1):
         # Total landings are sum for species in "Tuna", "Sharks" areas
         # since same species correspond to different areas
@@ -699,11 +699,11 @@ def compute_appendix_landings(
     # Remove duplicate values in columns not in Tier, U, M, O
     def manually_group_df(df, check_col, group_cols):
         result = df.copy()
-            
+
         mask = df[check_col] == df[check_col].shift(-1)
         result.loc[mask.shift(1, fill_value=False), group_cols] = np.nan
-                    
-        return result   
+
+        return result
 
     check_col = "ASFIS Scientific Name"
     tier_cols = ["Tier", "U", "M", "O"]
@@ -716,8 +716,7 @@ def compute_appendix_landings(
     species_landings_dec = manually_group_df(
         species_landings_dec, check_col, group_cols
     )
-    
-    
+
     # Reorder columns
     columns_order = [
         "Area",
@@ -803,10 +802,10 @@ def compute_appendix_landings(
             )
             .reset_index(drop=True)
         )
-        
+
         # Add missing ISSCAAP Group stocks to bottom
         no_isscaap_mask = area_landings["ISSCAAP Code"].isna()
-        
+
         if sum(no_isscaap_mask) > 0:
             area_landings["ISSCAAP Code"] = area_landings["ISSCAAP Code"].astype(object)
             area_landings.loc[no_isscaap_mask, "ISSCAAP Code"] = "Missing"
@@ -1356,6 +1355,7 @@ def compute_percent_coverage(
     landings_key="Stock Landings 2021",
     tier=None,
     year=2021,
+    area_key="Area",
 ):
     total_cov, total_area_l = 0, 0
     pc_dict = {}
@@ -1379,6 +1379,7 @@ def compute_percent_coverage(
             species_landings,
             isscaap_to_remove=isscaap_to_remove,
             special_groups={},
+            area_key=area_key,
         )[year]
 
         pc_dict[area] = 100 * cov / area_l
@@ -1430,10 +1431,18 @@ def compare_weighted_percentages(previous, update):
     comp = comp.drop(columns=[col for col in comp.columns if "(Mt)" in col[1]])
 
     comp.columns = pd.MultiIndex.from_tuples(
-        [("Updated SoSI Categories", col[1]) if "_x" in col[0] else ("Previous SoSI Categories", col[1]) for col in comp.columns]
+        [
+            (
+                ("Updated SoSI Categories", col[1])
+                if "_x" in col[0]
+                else ("Previous SoSI Categories", col[1])
+            )
+            for col in comp.columns
+        ]
     )
 
     return comp
+
 
 def compute_species_weighted_percentages(stock_landings, species_list):
     species_mask = stock_landings["ASFIS Scientific Name"].isin(species_list)
