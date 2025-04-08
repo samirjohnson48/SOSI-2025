@@ -30,7 +30,7 @@ def use_proxy_landings(
     proxy_landings,
     primary_key=["ASFIS Scientific Name", "Location"],
     landings_key="Stock Landings 2021",
-    proxy_landings_key="Proxy Species Landings",
+    proxy_landings_key="Proxy Stock Landings",
     proxy_species_key="Proxy Species",
 ):
     merge = pd.merge(stock_landings, proxy_landings, on=primary_key, how="left")
@@ -74,11 +74,7 @@ def compute_missing_landings(
         )
         proxy_species = proxy_species[pd.notna(proxy_species)]
 
-        # Don't include seals since they are taken out in calculations
-        seals_mask = df["ISSCAAP Code"] == 63
-        no_l = df[
-            (no_landings_mask | (df["ASFIS Name"].isin(proxy_species))) & ~seals_mask
-        ]
+        no_l = df[no_landings_mask | (df["ASFIS Name"].isin(proxy_species))]
 
         # Get total landings of Marine Fishes NEI in area for 2021
         nei = cap[(cap["ASFIS Name"].isin(proxy_species))][year].sum()

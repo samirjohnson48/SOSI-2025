@@ -28,10 +28,12 @@ def format_fishstat(fishstat, code_to_scientific=[], year_start=1950, year_end=2
     return fishstat
 
 
-def explode_stocks(species_landings):
+def explode_stocks(species_landings, key="FAO Areas"):
     sl = species_landings.copy()
 
-    sl["FAO Area"] = sl["FAO Major Fishing Area(s)"].apply(lambda x: x.split(", "))
+    sl[key] = sl[key].astype(str)
+
+    sl["FAO Area"] = sl[key].apply(lambda x: x.split(", "))
 
     sl = sl.explode("FAO Area").reset_index(drop=True)
 
@@ -39,7 +41,7 @@ def explode_stocks(species_landings):
         lambda x: int(x) if x.isdigit() else print(f"{x} cannot be cast to type int")
     )
 
-    sl = sl.drop(columns="FAO Major Fishing Area(s)")
+    sl = sl.drop(columns=key)
 
     return sl
 
