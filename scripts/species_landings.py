@@ -59,7 +59,7 @@ def main():
         os.path.join(output_dir, "stock_assessments.xlsx")
     )
     species_landings = stock_assessments[
-        ["FAO Areas", "ASFIS Scientific Name", "Location"]
+        ["FAO Areas", "Alpha3_Code", "ASFIS Scientific Name", "Location"]
     ].copy()
 
     # Expand list of stocks across their FAO Major Fishing Area(s)
@@ -69,14 +69,32 @@ def main():
     year_start, year_end = 1950, 2021
     years = list(range(year_start, year_end + 1))
 
-    pk = ["FAO Area", "ASFIS Scientific Name"]
+    pk = ["FAO Area", "Alpha3_Code", "ASFIS Scientific Name"]
 
     species_landings = species_landings.drop_duplicates(pk)[pk].copy()
+
+    # Define species with multiple ASFIS entries
+    mult_sns = [
+        "Actinopterygii",
+        "Clupeiformes (=Clupeoidei)",
+        "Crustacea",
+        "Elasmobranchii",
+        "Gobiidae",
+        "Mollusca",
+        "Palaemonidae",
+        "Perciformes (Others)",
+        "Testudinata",
+    ]
 
     print("Computing species landings...")
     tqdm.pandas()
     species_landings[years] = species_landings.progress_apply(
-        compute_species_landings, args=(fishstat,), axis=1
+        compute_species_landings,
+        args=(
+            fishstat,
+            mult_sns,
+        ),
+        axis=1,
     )
 
     # Substitute landings for certain stocks
