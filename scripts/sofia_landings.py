@@ -4,7 +4,6 @@
 import os
 import pandas as pd
 import numpy as np
-import json
 from tqdm import tqdm
 
 from utils.sofia_landings import *
@@ -14,6 +13,7 @@ from utils.species_landings import (
     compute_species_landings,
 )
 from utils.stock_assessments import get_asfis_mappings
+from utils.stock_landings import compute_missing_species_landings
 
 
 def main():
@@ -41,6 +41,7 @@ def main():
             "Species": "ASFIS Scientific Name",
             "X2021": "Status",
             "Area": "FAO Area",
+            "Sp.group": "ISSCAAP Code",
         }
     )
 
@@ -48,23 +49,15 @@ def main():
         lambda x: f"Area {x}" if isinstance(x, int) else x
     )
 
-    special_groups = pd.read_excel(
-        os.path.join(input_dir, "special_groups_species.xlsx")
-    )
-
-    sg_salmon_mask = special_groups["Analysis Group"] == "Area 67 - Salmon"
-    salmon_list = special_groups[sg_salmon_mask]["ASFIS Scientific Name"].unique()
-
-    sofia_salmon_mask = sofia["ASFIS Scientific Name"].isin(salmon_list)
-    sofia_67_mask = sofia["FAO Area"] == 67
-
-    sofia.loc[sofia_67_mask & sofia_salmon_mask, "Analysis Group"] = "Area 67 - Salmon"
-    sofia.loc[sofia_67_mask & ~sofia_salmon_mask, "Analysis Group"] = (
-        "Area 67 - Other Stocks"
-    )
-
     sofia = sofia[
-        ["Analysis Group", "FAO Area", "ASFIS Scientific Name", "ASFIS Name", "Status"]
+        [
+            "Analysis Group",
+            "FAO Area",
+            "ISSCAAP Code",
+            "ASFIS Scientific Name",
+            "ASFIS Name",
+            "Status",
+        ]
     ]
     sofia = sofia.dropna(subset=["ASFIS Scientific Name", "ASFIS Name"], how="all")
     sofia = sofia[sofia["Analysis Group"] != "Tunas"]
@@ -194,22 +187,29 @@ def main():
         sofia["ASFIS Name"]
     )
 
+    asfis = mappings["ASFIS"]
+    scientific_to_code = dict(zip(asfis["Scientific_Name"], asfis["Alpha3_Code"]))
+    sofia["Alpha3_Code"] = sofia["ASFIS Scientific Name"].map(scientific_to_code)
+
     # Remove tunas reported in FAO Areas
     # Retrieve location to area map for tunas
     for idx, tuna_row in sofia_tunas.iterrows():
         area = tuna_row["FAO Area"]
-        ag = f"Area {area}" if area != 67 else "Area 67 - Other Stocks"
+        ag = f"Area {area}"
 
         ag_mask = sofia["Analysis Group"] == ag
         tuna_mask = sofia["ASFIS Scientific Name"] == tuna_row["ASFIS Scientific Name"]
 
         sofia = sofia[~(ag_mask & tuna_mask)]
 
+    # Take out Marine Fishes NEI
+    mf_mask = sofia["ASFIS Scientific Name"] == "Actinopterygii"
+    sofia = sofia[~mf_mask].reset_index(drop=True)
+
     # Retrieve fishstat data to assign landings
     fishstat = pd.read_csv(os.path.join(input_dir, "global_capture_production.csv"))
 
     # Format fishstat data
-    asfis = mappings["ASFIS"]
     code_to_scientific = dict(zip(asfis["Alpha3_Code"], asfis["Scientific_Name"]))
     fishstat = format_fishstat(fishstat, code_to_scientific)
 
@@ -222,11 +222,23 @@ def main():
         compute_species_landings,
         args=(
             fishstat,
+            [],
             year_start,
             year_end,
         ),
         axis=1,
     )
+
+    species_map = pd.read_excel(
+        os.path.join(input_dir, "SOS_species_map_landings.xlsx")
+    )
+
+    sofia_ = compute_missing_species_landings(species_map, sofia)
+
+    sofia = pd.merge(sofia, sofia_, on=["FAO Area", "ASFIS Scientific Name"])
+
+    sofia[2021] = sofia["2021_y"].copy()
+    sofia = sofia.drop(columns=["2021_x", "2021_y"])
 
     # We do not have weighting for SOFIA stocks, so we normalized landings
     # by number of species of same name within a given area

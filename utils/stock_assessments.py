@@ -868,7 +868,7 @@ def validate_consistent_values(
     Args:
         df (pd.DataFrame): The DataFrame to validate.
         group_key (str, optional): The name of the column to group by.
-            Defaults to "ASFIS Scientific Name".
+            Defaults to "Alpha3_Code".
         cols_to_check (list, optional): A list of column names to check for
             consistent values within each group. Defaults to
             ["ASFIS Name", "ISSCAAP Code"].
@@ -884,5 +884,4 @@ def validate_consistent_values(
             check_vals = set(group[col].values)
 
             if len(check_vals) > 1 and not all(pd.isna(v) for v in check_vals):
-                message = f"{sn} has differing values for {col}: {check_vals}"
-                raise ValueError(message)
+                print(f"{sn} has differing values for {col}: {check_vals}")

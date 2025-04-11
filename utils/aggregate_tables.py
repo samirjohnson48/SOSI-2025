@@ -4,13 +4,13 @@
 
 import pandas as pd
 import numpy as np
-import re
 import json
 from tqdm import tqdm
 from openpyxl import load_workbook
 from functools import reduce
 
 from utils.species_landings import compute_species_landings
+from utils.stock_landings import get_numbers_from_string
 
 
 def round_excel_file(filename, decimal_places=2, lt_one=False):
@@ -357,12 +357,6 @@ def create_sg_dict(
     return sg_dict
 
 
-def get_numbers_from_string(text):
-    numbers_str = re.findall(r"\d+", text)
-    numbers_int = [int(num) for num in numbers_str]
-    return numbers_int
-
-
 def compute_total_area_landings(
     area,
     fishstat,
@@ -521,6 +515,17 @@ def compute_appendix_landings(
     year_end=2021,
     last_decade_year=2010,
 ):
+    # # Remove proxy landings from the 2021 column, since we want to report the landings
+    # # as found in Fishstatj
+    sl_ = species_landings.copy()
+    # proxy_mask = sl_["Proxy Code"].notna()
+    # na_mask = sl_.apply(
+    #     lambda row: all(pd.isna(row[y]) for y in range(year_start, year_end)),
+    #     axis=1
+    # )
+    # sl_.loc[proxy_mask & na_mask, 2021] = np.nan
+    # sl_.loc[proxy_mask & ~na_mask, 2021] = 0
+
     # Convert Shark species landings from dictionary back to total number
     # Exclude landings from sharks in FAO areas
     agg_dict = {
@@ -534,9 +539,7 @@ def compute_appendix_landings(
         agg_dict[year] = "sum"
 
     sl = (
-        species_landings.groupby(
-            ["Analysis Group", "ASFIS Scientific Name", "Location"]
-        )
+        sl_.groupby(["Analysis Group", "ASFIS Scientific Name", "Location"])
         .agg(agg_dict)
         .reset_index()
     )
@@ -577,6 +580,10 @@ def compute_appendix_landings(
         f"{col[0]}_{col[1]}" if col[1] and isinstance(col[0], int) else col[0]
         for col in aggregated_species.columns
     ]
+
+    aggregated_species["FAO Area"] = aggregated_species["FAO Area"].apply(
+        lambda x: sum(x, [])
+    )
 
     # Retrieve the most activate countries for each species for the given area(s)
     def most_active_countries(row, country_key="ISO3", year=2021):
@@ -624,7 +631,7 @@ def compute_appendix_landings(
         species_landings_dec[year] = species_landings_dec.apply(
             lambda row: (
                 row[f"{year}_sum"]
-                if row["Analysis Group"] in special_groups.keys()
+                if row["Analysis Group"] in ["Sharks", "Tuna"]  # Make more general
                 else row[f"{year}_first"]
             ),
             axis=1,

@@ -27,12 +27,19 @@ def main():
     # Retrieve the species landings
     species_landings = pd.read_excel(os.path.join(output_dir, "species_landings.xlsx"))
 
+    # Compute the missing species landings
+    sp_map = pd.read_excel(os.path.join(input_dir, "SOS_species_map_landings.xlsx"))
+    spl = compute_missing_species_landings(sp_map, species_landings)
+
     # Retrieve the weights
     weights = pd.read_excel(os.path.join(output_dir, "stock_weights.xlsx"))
 
+    # --- First compute the default landings ---
+    # These are used in the case of no available landings or proxy landings
+    # Based on reallocation of NEI landings
     # Merge the two dataframes
     stock_landings = pd.merge(
-        species_landings,
+        spl,
         weights,
         on=["FAO Area", "ASFIS Scientific Name"],
     )
@@ -54,15 +61,6 @@ def main():
     )
     stock_landings = stock_landings.drop(columns="Num Stocks")
 
-    # Use proxy species landings for stocks with missing landings
-    proxy_landings = pd.read_excel(
-        os.path.join(input_dir, "proxy_species_for_landings.xlsx"),
-    )
-    proxy_landings = proxy_landings.drop(columns="FAO Area")
-
-    # Use the proxy landings
-    stock_landings = use_proxy_landings(stock_landings, proxy_landings)
-
     # For the remaining stocks with missing landings, we use the NEI species corresponding
     # to the stock's ISSCAAP Code. We split the landings according to the distribution
     # of status among stocks with landings
@@ -77,27 +75,27 @@ def main():
     stock_landings = pd.merge(stock_landings, stock_assessments, on=primary_key)
 
     # Retrieve ISSCAAP Code to NEI species mapping
-    with open(os.path.join(input_dir, "ISSCAAP_to_NEI.json"), "r") as file:
-        isscaap_to_nei = json.load(file)
-    isscaap_to_nei = {
-        int(k): v for k, v in isscaap_to_nei.items()
-    }  # JSON saves keys as strings
+    with open(os.path.join(input_dir, "NEI_to_ISSCAAP.json"), "r") as file:
+        nei_to_isscaap = json.load(file)
 
     # Retrieve fishstat and ASFIS data for NEI landings
     fishstat = pd.read_csv(os.path.join(input_dir, "global_capture_production.csv"))
     mappings = get_asfis_mappings(input_dir, "ASFIS_sp_2024.csv")
     asfis = mappings["ASFIS"]
     code_to_scientific = dict(zip(asfis["Alpha3_Code"], asfis["Scientific_Name"]))
-    scientific_to_name = mappings["ASFIS Scientific Name to ASFIS Name"]
+    code_to_name = dict(zip(asfis["Alpha3_Code"], asfis["English_name"]))
 
     fishstat = format_fishstat(fishstat, code_to_scientific)
-    fishstat["ASFIS Name"] = fishstat["ASFIS Scientific Name"].map(scientific_to_name)
+    fishstat["ASFIS Name"] = fishstat["Alpha3_Code"].map(code_to_name)
 
-    numerical_areas = [
-        area for area in stock_landings["FAO Area"].unique() if isinstance(area, int)
+    # Get list of analysis groups which are not in special groups
+    sg_df = pd.read_excel(os.path.join(input_dir, "special_groups_species.xlsx"))
+    sg_list = sg_df["Analysis Group"].unique()
+    numerical_ags = [
+        ag for ag in stock_landings["Analysis Group"].unique() if ag not in sg_list
     ]
-    stock_landings = compute_missing_landings(
-        stock_landings, fishstat, numerical_areas, isscaap_to_nei
+    stock_landings = compute_missing_landings_v1(
+        stock_landings, fishstat, numerical_ags, nei_to_isscaap
     )
 
     # Save assigned landings to output file
@@ -109,6 +107,7 @@ def main():
         "Stock Landings 2021",
     ]
     stock_landings = stock_landings[cols_to_save]
+
     stock_landings.to_excel(
         os.path.join(output_dir, "stock_landings.xlsx"), index=False
     )

@@ -765,6 +765,26 @@ def main():
         os.path.join(input_dir, "stock_reference_list.xlsx")
     )
 
+    if "Alpha3_Code" not in stock_reference.columns:
+        asfis = get_asfis_mappings(input_dir, "ASFIS_sp_2024.csv")["ASFIS"]
+
+        sn_to_code = dict(zip(asfis["Scientific_Name"], asfis["Alpha3_Code"]))
+        name_to_code = dict(zip(asfis["English_name"], zip(asfis["Alpha3_Code"])))
+        name_to_code = {k: v[0] for k, v in name_to_code.items()}
+
+        alpha_count = asfis.groupby("Scientific_Name")["Alpha3_Code"].nunique()
+
+        mult_sns = list(alpha_count[alpha_count > 1].index)
+
+        mult_mask = stock_reference["ASFIS Scientific Name"].isin(mult_sns)
+
+        stock_reference["Alpha3_Code"] = stock_reference["ASFIS Scientific Name"].map(
+            sn_to_code
+        )
+        stock_reference.loc[mult_mask, "Alpha3_Code"] = stock_reference.loc[
+            mult_mask, "ASFIS Name"
+        ].map(name_to_code)
+
     # -- Validaiton of stock reference list --
     # Check uniqueness and non-nullity of primary key ASFIS Scientific Name, Location
     validate_primary_key(stock_reference)

@@ -75,10 +75,10 @@ def main():
         for sheet in sofia_sheets
     }
     sofia_sheet_to_area = {
-        sheet: int(area) if area.isdigit() else area
+        sheet: f"Area {area}" if area.isdigit() else area
         for sheet, area in sofia_sheet_to_area.items()
     }
-    sofia_sheet_to_area["area81v2"] = 81
+    sofia_sheet_to_area["area81v2"] = "Area 81"
     sofia_sheet_to_area["Tunas_HilarioISSF"] = "Tuna"
 
     sofia_file_path = os.path.join(
@@ -366,7 +366,6 @@ def main():
     stock_landings = (
         stock_landings_fao_areas.groupby(["Analysis Group", "ASFIS Scientific Name", "Location"])
         .agg({
-                "Proxy Species": "first", 
                 "ASFIS Name": "first",
                 "ISSCAAP Code": "first",
                 "Status": "first",
@@ -397,13 +396,11 @@ def main():
         fishstat,
         isscaap_to_remove,
     )
-    # Retrieve SOFIA with landings
-    sofia_landings_fao_areas = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings_fao_areas.xlsx"))
-
-    # Add ISSCAAP Code to SOFIA data
-    # sofia_landings["ISSCAAP Code"] = sofia_landings["ASFIS Scientific Name"].map(scientific_to_isscaap)
     
     # Compute percent coverage for SOFIA data
+    # Retrieve SOFIA landings
+    sofia_landings_fao_areas = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
+    
     pc_sofia = compute_percent_coverage(
         sofia_landings_fao_areas,
         species_landings,
@@ -428,9 +425,6 @@ def main():
     wp_area = compute_weighted_percentages(stock_landings)
     
     # Compute weighted percentages for SOFIA
-    # Get assessed stocks from SOFIA data
-    sofia_landings_fao_areas = pd.read_excel(os.path.join(clean_data_dir, "sofia_landings.xlsx"))
-    
     # Aggregate landings based on Analysis Group
     agg_dict = {
         "ASFIS Name": "first",
