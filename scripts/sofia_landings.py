@@ -4,6 +4,7 @@
 import os
 import pandas as pd
 import numpy as np
+import json
 from tqdm import tqdm
 
 from utils.sofia_landings import *
@@ -13,7 +14,10 @@ from utils.species_landings import (
     compute_species_landings,
 )
 from utils.stock_assessments import get_asfis_mappings
-from utils.stock_landings import compute_missing_species_landings
+from utils.stock_landings import (
+    compute_missing_species_landings,
+    compute_missing_landings_v1,
+)
 
 
 def main():
@@ -203,8 +207,12 @@ def main():
         sofia = sofia[~(ag_mask & tuna_mask)]
 
     # Take out Marine Fishes NEI
-    mf_mask = sofia["ASFIS Scientific Name"] == "Actinopterygii"
+    mf_mask = sofia["ASFIS Scientific Name"].isin(["Actinopterygii", "Osteichthyes"])
     sofia = sofia[~mf_mask].reset_index(drop=True)
+
+    # Remove rows with no status
+    # status_mask = sofia["Status"].isin(["U", "M", "O"])
+    # sofia = sofia[status_mask].reset_index(drop=True)
 
     # Retrieve fishstat data to assign landings
     fishstat = pd.read_csv(os.path.join(input_dir, "global_capture_production.csv"))
@@ -212,6 +220,9 @@ def main():
     # Format fishstat data
     code_to_scientific = dict(zip(asfis["Alpha3_Code"], asfis["Scientific_Name"]))
     fishstat = format_fishstat(fishstat, code_to_scientific)
+
+    code_to_name = dict(zip(asfis["Alpha3_Code"], asfis["English_name"]))
+    fishstat["ASFIS Name"] = fishstat["Alpha3_Code"].map(code_to_name)
 
     year_start, year_end = 1950, 2021
     years = list(range(year_start, year_end + 1))
@@ -229,16 +240,16 @@ def main():
         axis=1,
     )
 
-    species_map = pd.read_excel(
-        os.path.join(input_dir, "SOS_species_map_landings.xlsx")
-    )
+    # species_map = pd.read_excel(
+    #     os.path.join(input_dir, "SOS_species_map_landings.xlsx")
+    # )
 
-    sofia_ = compute_missing_species_landings(species_map, sofia)
+    # sofia_ = compute_missing_species_landings(species_map, sofia)
 
-    sofia = pd.merge(sofia, sofia_, on=["FAO Area", "ASFIS Scientific Name"])
+    # sofia = pd.merge(sofia, sofia_, on=["FAO Area", "ASFIS Scientific Name"])
 
-    sofia[2021] = sofia["2021_y"].copy()
-    sofia = sofia.drop(columns=["2021_x", "2021_y"])
+    # sofia[2021] = sofia["2021_y"].copy()
+    # sofia = sofia.drop(columns=["2021_x", "2021_y"])
 
     # We do not have weighting for SOFIA stocks, so we normalized landings
     # by number of species of same name within a given area
@@ -249,6 +260,28 @@ def main():
     tuna_list = sofia_tunas["ASFIS Scientific Name"].unique()
     tuna_mask = sofia_landings["ASFIS Scientific Name"].isin(tuna_list)
     sofia_landings.loc[southern_mask & ~tuna_mask, "Analysis Group"] = "Area 48,58,88"
+
+    # Compute missing landings
+    with open(os.path.join(input_dir, "NEI_to_ISSCAAP.json"), "r") as file:
+        nei_to_isscaap = json.load(file)
+
+    ags = [ag for ag in sofia_landings["Analysis Group"] if ag != "Tuna"]
+
+    sofia_landings = compute_missing_landings_v1(
+        sofia_landings, fishstat, ags, nei_to_isscaap, key=2021, nei_factor=4
+    )
+
+    cols_to_keep = [
+        "Analysis Group",
+        "FAO Area",
+        "ISSCAAP Code",
+        "ASFIS Scientific Name",
+        "ASFIS Name",
+        "Status",
+        2021,
+    ]
+
+    sofia_landings = sofia_landings[cols_to_keep]
 
     sofia_landings.to_excel(
         os.path.join(output_dir, "sofia_landings.xlsx"), index=False
