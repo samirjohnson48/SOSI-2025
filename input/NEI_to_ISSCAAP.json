@@ -1,0 +1,56 @@
+{
+    "Natantian decapods NEI": [
+        45
+    ],
+    "Antarctic krill NEI": [
+        46
+    ],
+    "Cephalopods NEI": [
+        57
+    ],
+    "Sharks, rays, skates, etc. NEI": [
+        38
+    ],
+    "Marine crabs NEI": [
+        42
+    ],
+    "Lobsters NEI": [
+        43
+    ],
+    "King crabs, stone crabs NEI": [
+        44
+    ],
+    "Marine crustaceans NEI": [
+        47
+    ],
+    "Gastropods NEI": [
+        52
+    ],
+    "Cupped oysters NEI": [
+        53
+    ],
+    "Sea urchins, etc. NEI": [
+        76
+    ],
+    "Clams, etc. NEI": [
+        56
+    ],
+    "Giant kelps NEI": [
+        91
+    ],
+    "Marine fishes NEI": [
+        34,
+        35,
+        32,
+        33,
+        31,
+        37,
+        25,
+        23,
+        36,
+        24
+    ],
+    "River eels NEI": [
+        22
+    ]
+}

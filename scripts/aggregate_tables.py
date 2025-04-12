@@ -428,13 +428,9 @@ def main():
     # Aggregate landings based on Analysis Group
     agg_dict = {
         "ASFIS Name": "first",
+        2021: "sum"
     }
     
-    years = range(1950, 2022)
-    
-    for year in years:
-        agg_dict[year] = "sum"
-
     sofia_landings = (
         sofia_landings_fao_areas.groupby(["Analysis Group", "ASFIS Scientific Name", "Status"])
         .agg(agg_dict)

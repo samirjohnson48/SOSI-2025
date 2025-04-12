@@ -144,6 +144,7 @@ def compute_missing_landings_v1(
     nei_to_isscaap,
     year=2021,
     key="Stock Landings 2021",
+    nei_factor=1,
 ):
     sl = stock_landings.copy()
 
@@ -182,7 +183,7 @@ def compute_missing_landings_v1(
                 n_no_l = sum(no_l_mask & isscaap_mask)
                 n_has_l = max(sum(~no_l_mask & isscaap_mask), 1)
 
-                factor = min(n_no_l / n_has_l, 1)
+                factor = min(n_no_l / n_has_l, 1) / nei_factor
 
             # Get total landings of NEI species in area for 2021
             nei_l = cap[(cap["ASFIS Name"] == nei)][year].sum()
