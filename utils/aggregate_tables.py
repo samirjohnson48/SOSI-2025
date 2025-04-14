@@ -1237,21 +1237,15 @@ def compute_species_weighted_percentages(stock_landings, species_list):
 
 
 def compute_top_species_by_area(
-    areas, stock_assessments, stock_landings, fishstat, n=10, year=2021
+    ags, stock_assessments, stock_landings, fishstat, n=10, year=2021
 ):
     top_species_dfs = {}
 
-    for area in areas:
-        if isinstance(area, int):
-            area_list = [area]
-        elif "," in area:
-            area_list = [int(a) for a in area.split(",")]
-        else:
-            print(f"Area {area} is not a FAO Major Fishing Area")
-            return
+    for ag in ags:
+        areas = get_numbers_from_string(ag)
 
-        fs_area_mask = fishstat["Area"].isin(area_list)
-        sa_area_mask = stock_assessments["Analysis Group"] == area
+        fs_area_mask = fishstat["Area"].isin(areas)
+        sa_area_mask = stock_assessments["Analysis Group"] == ag
 
         species_in_area = stock_assessments[sa_area_mask][
             "ASFIS Scientific Name"
@@ -1286,7 +1280,7 @@ def compute_top_species_by_area(
             "Total"
         )
 
-        sl_area_mask = stock_landings["Analysis Group"] == area
+        sl_area_mask = stock_landings["Analysis Group"] == ag
         sl_top_species_mask = stock_landings["ASFIS Scientific Name"].isin(
             top_species_list
         )
@@ -1307,6 +1301,6 @@ def compute_top_species_by_area(
             suffixes=(" by Number", " by Landings"),
         )
 
-        top_species_dfs[area] = comb
+        top_species_dfs[ag] = comb
 
     return top_species_dfs

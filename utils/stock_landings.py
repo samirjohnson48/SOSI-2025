@@ -118,7 +118,7 @@ def compute_missing_species_landings(
         spl.loc[mask1, landings_col1] *= mlr
         spl.loc[mask2, landings_col2] *= 1 - mlr
 
-        miss_mask = spl["_merge"] == "both"
+    miss_mask = spl["_merge"] == "both"
 
     spl[2021] = spl[2021].fillna(0)
 
