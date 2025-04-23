@@ -14,13 +14,7 @@ from utils.species_landings import format_fishstat, explode_stocks
 
 def main():
     # Define directories for input and output files
-    if os.path.basename(os.getcwd()) == "SOSI-2025":
-        parent_dir = os.getcwd()
-    elif os.path.basename(os.path.dirname(os.getcwd())) == "SOSI-2025":
-        parent_dir = os.path.dirname(os.getcwd())
-    else:
-        raise FileNotFoundError("SOSI-2025 folder could not be found.")
-
+    parent_dir = os.getcwd()
     input_dir = os.path.join(parent_dir, "input")
     clean_data_dir = os.path.join(parent_dir, os.path.join("output", "clean_data"))
     output_dir = os.path.join(parent_dir, os.path.join("output", "aggregate_tables"))
