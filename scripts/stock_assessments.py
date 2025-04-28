@@ -37,7 +37,6 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 import os
 import pandas as pd
 import numpy as np
-import json
 
 from utils.stock_assessments import *
 
@@ -49,12 +48,12 @@ def main():
     output_dir = os.path.join(parent_dir, os.path.join("output", "clean_data"))
 
     os.makedirs(output_dir, exist_ok=True)
-    
+
     # Read in stock reference list
     stock_reference = pd.read_excel(
         os.path.join(input_dir, "stock_reference_list.xlsx")
     )
-    
+
     # Add alpha3 codes to species
     asfis = get_asfis_mappings(input_dir, "ASFIS_sp_2024.csv")["ASFIS"]
 
