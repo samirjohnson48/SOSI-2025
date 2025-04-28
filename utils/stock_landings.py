@@ -4,7 +4,6 @@
 
 import pandas as pd
 import numpy as np
-import json
 import re
 
 
@@ -137,7 +136,7 @@ def compute_missing_species_landings(
     return spl
 
 
-def compute_missing_landings_v1(
+def compute_missing_stock_landings(
     stock_landings,
     fishstat,
     analysis_groups,
@@ -284,136 +283,3 @@ def compute_missing_landings_v1(
                 ] = nei
 
     return sl
-
-
-def compute_missing_landings_v2(
-    species_map,
-    method,
-    fishstat,
-    stock_assessments,
-    species_landings,
-    weights,
-    default_landings,
-    missing_landings_ratio=1 / 3,
-):
-    fs = (
-        fishstat.groupby(["Area", "Alpha3_Code"])[2021]
-        .sum()
-        .reset_index()
-        .rename(columns={"Area": "FAO Area"})
-    )
-
-    species_map = species_map.rename(
-        columns={
-            "Area": "FAO Area",
-            "ASFIS species (Scientific name)": "ASFIS Scientific Name",
-        }
-    )[["FAO Area", "ASFIS Scientific Name", method]]
-
-    cols = list(species_map.columns)
-
-    col = "Species Landings 2021"
-
-    species_map = species_map.rename(columns={method: "Alpha3_Code"})
-
-    species_map = pd.merge(species_map, fs, on=["FAO Area", "Alpha3_Code"], how="left")
-
-    species_map = species_map.rename(columns={"Alpha3_Code": method, 2021: col})
-
-    # Normalize the landings across the number of same code in area
-    species_map["N"] = species_map.groupby(["FAO Area", method])["FAO Area"].transform(
-        "size"
-    )
-
-    species_map[col] /= species_map["N"]
-
-    species_map = species_map.drop(columns="N")
-
-    cols.append(col)
-
-    species_map = species_map[cols]
-
-    # Use the default landings to fill in the rest which are not mapped
-    # Default landings computed from v1 of compute missing landings
-
-    sl_grouped = (
-        default_landings.groupby(["FAO Area", "ASFIS Scientific Name"])[
-            "Stock Landings 2021"
-        ]
-        .sum()
-        .reset_index()
-    ).rename(columns={"Stock Landings 2021": "Default Landings"})
-
-    species_map = pd.merge(
-        species_map, sl_grouped, on=["FAO Area", "ASFIS Scientific Name"], how="left"
-    )
-
-    species_map = species_map[cols + ["Default Landings"]]
-
-    col_fill = "Default Landings"
-    no_l_mask = species_map[col].isna() | (species_map[col] == 0)
-    species_map.loc[no_l_mask, col] = species_map.loc[no_l_mask, col_fill]
-
-    spl_mod = pd.merge(
-        species_landings,
-        species_map,
-        on=["FAO Area", "ASFIS Scientific Name"],
-        how="left",
-    )
-
-    # Combine the missing landings with the mapped landings
-    # If proxy species in method appears in assessment in same area
-    # we must split the landings accordingly so not to double count
-
-    col_fill = 2021
-
-    og_mask = spl_mod[col].isna()
-    spl_mod["Flag"] = og_mask
-
-    pairs1 = set(zip(spl_mod[og_mask]["Alpha3_Code"], spl_mod[og_mask]["FAO Area"]))
-    pairs2 = set(zip(spl_mod[~og_mask][method], spl_mod[~og_mask]["FAO Area"]))
-
-    matches = pairs1.intersection(pairs2)
-    matches = [m for m in matches if pd.notna(m[0])]
-
-    mask1 = spl_mod.apply(
-        lambda row: (row[method], row["FAO Area"]) in matches,
-        axis=1,
-    )  # Rows from method which are reported in area
-
-    mask2 = spl_mod.apply(
-        lambda row: (row["Alpha3_Code"], row["FAO Area"]) in matches,
-        axis=1,
-    )  # Rows reported in area which are in method
-
-    spl_mod.loc[:, col] = spl_mod[col].fillna(spl_mod[col_fill])
-
-    spl_mod.loc[mask1, col] *= missing_landings_ratio
-    spl_mod.loc[mask2, col] *= 1 - missing_landings_ratio
-
-    cols_to_keep = ["FAO Area", "Alpha3_Code", "ASFIS Scientific Name", col]
-
-    sl_mod = pd.merge(
-        spl_mod,
-        weights,
-        on=["FAO Area", "ASFIS Scientific Name"],
-    )
-
-    sl_mod = pd.merge(
-        sl_mod,
-        stock_assessments,
-        on=["ASFIS Scientific Name", "Location"],
-        suffixes=("", "_x"),
-    )
-
-    sl_mod = compute_num_stocks(sl_mod)
-
-    stock_col = "Stock Landings 2021"
-
-    sl_mod[stock_col] = sl_mod.apply(compute_landings, args=(col,), axis=1)
-
-    cols_to_keep = ["FAO Area", "ASFIS Scientific Name", "Location", stock_col]
-
-    sl_mod = sl_mod[cols_to_keep]
-
-    return sl_mod

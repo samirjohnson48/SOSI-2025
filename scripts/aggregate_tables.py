@@ -41,6 +41,9 @@ def main():
     sbn_area = compute_status_by_number(stock_assessments, "Analysis Group")
     sbn_tier = compute_status_by_number(stock_assessments, "Tier")
     
+    # Compute Status by Number grouped by Area weighted by Tier
+    sbn_area_v2 = compute_status_by_number_v2(stock_assessments)
+    
     vc_tier_area = compute_count_for_group(stock_assessments, group_col="Analysis Group", count_col="Tier")
     
     # Retrieve SOFIA Status by Number
@@ -152,6 +155,10 @@ def main():
     sbn_tier_fp = os.path.join(output_dir, "status_by_number_tier.xlsx")
     sbn_tier.to_excel(sbn_tier_fp, index=False)
     round_excel_file(sbn_tier_fp)
+    
+    sbn_area_v2_fp = os.path.join(output_dir, "status_by_number_weighted_by_tier.xlsx")
+    sbn_area_v2.to_excel(sbn_area_v2_fp)
+    round_excel_file(sbn_area_v2_fp)
 
     sbn_comp_fp = os.path.join(output_dir, "compare_status_by_number.xlsx")
     sbn_comp.to_excel(sbn_comp_fp)

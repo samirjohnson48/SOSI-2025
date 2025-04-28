@@ -14,10 +14,7 @@ from utils.species_landings import (
     compute_species_landings,
 )
 from utils.stock_assessments import get_asfis_mappings
-from utils.stock_landings import (
-    compute_missing_species_landings,
-    compute_missing_landings_v1,
-)
+from utils.stock_landings import compute_missing_stock_landings
 
 
 def main():
@@ -234,17 +231,6 @@ def main():
         axis=1,
     )
 
-    # species_map = pd.read_excel(
-    #     os.path.join(input_dir, "SOS_species_map_landings.xlsx")
-    # )
-
-    # sofia_ = compute_missing_species_landings(species_map, sofia)
-
-    # sofia = pd.merge(sofia, sofia_, on=["FAO Area", "ASFIS Scientific Name"])
-
-    # sofia[2021] = sofia["2021_y"].copy()
-    # sofia = sofia.drop(columns=["2021_x", "2021_y"])
-
     # We do not have weighting for SOFIA stocks, so we normalized landings
     # by number of species of same name within a given area
     sofia_landings = normalize_landings(sofia, years)
@@ -261,7 +247,7 @@ def main():
 
     ags = [ag for ag in sofia_landings["Analysis Group"] if ag != "Tuna"]
 
-    sofia_landings = compute_missing_landings_v1(
+    sofia_landings = compute_missing_stock_landings(
         sofia_landings, fishstat, ags, nei_to_isscaap, key=2021, nei_factor=4
     )
 

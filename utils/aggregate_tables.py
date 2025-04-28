@@ -4,12 +4,10 @@
 
 import pandas as pd
 import numpy as np
-import json
 from tqdm import tqdm
 from openpyxl import load_workbook
 from functools import reduce
 
-from utils.species_landings import compute_species_landings
 from utils.stock_landings import get_numbers_from_string
 
 
@@ -169,6 +167,47 @@ def compute_status_by_number(data, group):
     )
 
     return pd.concat([grouped, totals], ignore_index=True)
+
+def compute_status_by_number_v2(data, tier_weights={1: 1, 2: 0.5, 3: 0.25}):
+    sbn = pd.DataFrame()
+    
+    statuses = ["U", "M", "O"]
+    
+    for tier in [1,2,3]:
+        tier_mask = data["Tier"] == tier
+        temp = data[tier_mask].groupby("Analysis Group")["Status"].value_counts()
+        temp = temp.reset_index().pivot(columns="Status", values="count", index="Analysis Group")
+        temp = temp.rename(columns={s: f"{s}_{tier}" for s in statuses})
+        
+        for s in statuses:
+            temp[f"{s}_{tier}"] *= tier_weights[tier]
+        
+        if sbn.empty:
+            sbn = temp
+        else:
+            sbn = pd.merge(sbn, temp, on="Analysis Group", how="outer")
+            
+    for s in statuses:
+        sbn[s] = sbn[[f"{s}_{tier}" for tier in [1,2,3]]].sum(axis=1)
+        
+    sbn["T"] = sbn[statuses].sum(axis=1)
+    
+    total_row = sbn.sum().to_frame().T
+    total_row.index = ["Global"]
+    
+    sbn = pd.concat([sbn, total_row])
+    
+    for s in statuses:
+        sbn[f"{s} (%)"] = 100 * sbn[s] / sbn["T"]
+        
+    sbn["Sustainable (%)"] = sbn["U (%)"] + sbn["M (%)"]
+    sbn["Unsustainable (%)"] = sbn["O (%)"]
+    
+    cols_to_keep = [f"{s} (%)" for s in statuses] + ["Sustainable (%)", "Unsustainable (%)"]
+    
+    sbn = sbn[cols_to_keep]
+    
+    return sbn
 
 
 def compare_status_by_number(update, previous):

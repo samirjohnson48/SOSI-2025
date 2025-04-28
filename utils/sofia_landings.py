@@ -7,7 +7,6 @@ These functions are implemented in ./main/sofia_landings.py
 import pandas as pd
 import numpy as np
 import re
-import os
 
 
 def convert_status_to_list(status):
