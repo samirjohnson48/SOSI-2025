@@ -3,10 +3,14 @@
 """
 
 import pandas as pd
-import numpy as np
 import os
-import matplotlib.pyplot as plt
 from tqdm import tqdm
+import matplotlib as mpl
+
+mpl.rcdefaults()
+
+# Make PDF font editable
+mpl.rcParams["pdf.fonttype"] = 42
 
 from utils.capture_production_figures import *
 from utils.species_landings import format_fishstat
@@ -21,9 +25,6 @@ def main():
     table_dir = os.path.join(parent_dir, "output", "aggregate_tables")
 
     os.makedirs(output_dir, exist_ok=True)
-
-    # Set font to Helvetica for figures
-    plt.rcParams["font.family"] = "Helvetica"
 
     # Retrieve fishstat data from input folder
     fishstat = pd.read_csv(os.path.join(input_dir, "global_capture_production.csv"))

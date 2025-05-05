@@ -168,45 +168,51 @@ def compute_status_by_number(data, group):
 
     return pd.concat([grouped, totals], ignore_index=True)
 
+
 def compute_status_by_number_v2(data, tier_weights={1: 1, 2: 0.5, 3: 0.25}):
     sbn = pd.DataFrame()
-    
+
     statuses = ["U", "M", "O"]
-    
-    for tier in [1,2,3]:
+
+    for tier in [1, 2, 3]:
         tier_mask = data["Tier"] == tier
         temp = data[tier_mask].groupby("Analysis Group")["Status"].value_counts()
-        temp = temp.reset_index().pivot(columns="Status", values="count", index="Analysis Group")
+        temp = temp.reset_index().pivot(
+            columns="Status", values="count", index="Analysis Group"
+        )
         temp = temp.rename(columns={s: f"{s}_{tier}" for s in statuses})
-        
+
         for s in statuses:
             temp[f"{s}_{tier}"] *= tier_weights[tier]
-        
+
         if sbn.empty:
             sbn = temp
         else:
             sbn = pd.merge(sbn, temp, on="Analysis Group", how="outer")
-            
+
     for s in statuses:
-        sbn[s] = sbn[[f"{s}_{tier}" for tier in [1,2,3]]].sum(axis=1)
-        
+        sbn[s] = sbn[[f"{s}_{tier}" for tier in [1, 2, 3]]].sum(axis=1)
+
     sbn["T"] = sbn[statuses].sum(axis=1)
-    
+
     total_row = sbn.sum().to_frame().T
     total_row.index = ["Global"]
-    
+
     sbn = pd.concat([sbn, total_row])
-    
+
     for s in statuses:
         sbn[f"{s} (%)"] = 100 * sbn[s] / sbn["T"]
-        
+
     sbn["Sustainable (%)"] = sbn["U (%)"] + sbn["M (%)"]
     sbn["Unsustainable (%)"] = sbn["O (%)"]
-    
-    cols_to_keep = [f"{s} (%)" for s in statuses] + ["Sustainable (%)", "Unsustainable (%)"]
-    
+
+    cols_to_keep = [f"{s} (%)" for s in statuses] + [
+        "Sustainable (%)",
+        "Unsustainable (%)",
+    ]
+
     sbn = sbn[cols_to_keep]
-    
+
     return sbn
 
 
@@ -311,27 +317,7 @@ def compute_summary_area_by_tier(data):
     return tier_summaries
 
 
-def convert_status_to_list(status):
-    if not isinstance(status, str) and np.isnan(status):
-        return [status]
-
-    separators = [",", "/", "-"]
-
-    sep = next((sep for sep in separators if sep in status), None)
-
-    if status == "OF":
-        return ["O", "F"]
-
-    if sep:
-        status_list = [s.strip()[0] for s in status.split(sep)]
-        return status_list
-    elif isinstance(status, str):
-        return [status.strip()]
-
-    return [status]
-
-
-def compute_species_status_by_number(data, species_list, fishstat):
+def compute_species_status_by_number(data, species_list, fishstat, year=2021):
     data = data[data["ASFIS Scientific Name"].isin(species_list)]
     group = (
         data.groupby(["ASFIS Scientific Name", "Status"]).size().unstack(fill_value=0)
@@ -341,10 +327,9 @@ def compute_species_status_by_number(data, species_list, fishstat):
     group = pd.concat([group, global_totals.to_frame().T])
     total_counts = group.sum(axis=1)
     percentages = group.div(total_counts, axis=0) * 100
-    # landings = data[["ASFIS Scientific Name", 2021]].rename(columns={"ASFIS Scientific Name": "Species"}).groupby("Species").sum()
     landings = (
         fishstat[fishstat["ASFIS Scientific Name"].isin(species_list)]
-        .groupby("ASFIS Scientific Name")[2021]
+        .groupby("ASFIS Scientific Name")[year]
         .sum()
         .sort_values(ascending=False)
     )
@@ -359,13 +344,13 @@ def compute_species_status_by_number(data, species_list, fishstat):
     )
     result.columns.names = ["Metric", "Status"]
     result = result.rename_axis("Species").reset_index()
-    result.sort_values(("Landings", 2021), ascending=False, inplace=True)
-    result.loc[result[("Species", "")] == "Global", ("Landings", 2021)] = result[
-        ("Landings", 2021)
+    result.sort_values(("Landings", year), ascending=False, inplace=True)
+    result.loc[result[("Species", "")] == "Global", ("Landings", year)] = result[
+        ("Landings", year)
     ].sum()
 
-    result[("Landings", 2021)] /= 1e6
-    result = result.rename(columns={2021: "2021 (Mt)"}, level=1)
+    result[("Landings", year)] /= 1e6
+    result = result.rename(columns={year: f"{year} (Mt)"}, level=1)
 
     return result
 
@@ -376,7 +361,7 @@ def create_sg_dict(
     area_key="FAO Area",
     species_key="ASFIS Scientific Name",
 ):
-    sg_grouped = sg_df.groupby("Analysis Group")
+    sg_grouped = sg_df.groupby(group_key)
 
     sg_dict = {}
 
@@ -444,10 +429,6 @@ def compute_total_area_landings(
 
         total_cap = cap[years].sum()
 
-        total_area = sl[sl[group_key] == area][years].sum()
-
-        # total_cap = total_cap.combine(total_area, max)
-
         return total_cap
 
     area_list = get_numbers_from_string(area) if isinstance(area, str) else [area]
@@ -492,7 +473,6 @@ def compute_total_area_landings(
 def compute_total_aquaculture_landings(
     area,
     aquaculture,
-    species_landings,
     special_groups={},
     isscaap_to_remove=[],
     year_start=1950,
@@ -1110,29 +1090,6 @@ def get_weighted_percentages_by_tier_and_area(stock_landings, total_landings):
     areas_df = pd.concat([areas_df, global_df])
 
     return areas_df
-
-
-def remove_isscaap_fishstat(
-    fishstat, stock_landings, isscaap_to_remove, landings_key, year
-):
-    sl, fs = stock_landings.copy(), fishstat.copy()
-    fs_isscaap_mask = ~fs["ISSCAAP Code"].isin(isscaap_to_remove)
-    sl_isscaap_mask = sl["ISSCAAP Code"].isin(isscaap_to_remove)
-
-    # Take out ISSCAAP Groups from Fishstat
-    fs = fs[fs_isscaap_mask]
-
-    # Add landings back to Fishstat from Stock Landings which are in ISSCAAP to remove
-    lta = sl[sl_isscaap_mask][
-        ["FAO Area", "ASFIS Scientific Name", "ISSCAAP Code"] + [landings_key]
-    ]
-
-    lta = lta.rename(columns={landings_key: year, "FAO Area": "Area"})
-
-    if not lta.empty:
-        fs = pd.concat([fs, lta])
-
-    return fs
 
 
 def compute_percent_coverage(

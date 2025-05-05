@@ -23,6 +23,7 @@ def main():
 
     # Compute the missing species landings
     sp_map = pd.read_excel(os.path.join(input_dir, "SOS_species_map_landings.xlsx"))
+
     spl = compute_missing_species_landings(sp_map, species_landings)
 
     # Retrieve the weights
@@ -53,7 +54,7 @@ def main():
     stock_landings["Stock Landings 2021"] = stock_landings.apply(
         compute_landings, axis=1
     )
-    stock_landings = stock_landings.drop(columns="Num Stocks")
+    # stock_landings = stock_landings.drop(columns="Num Stocks")
 
     # For the remaining stocks with missing landings, we use the NEI species corresponding
     # to the stock's ISSCAAP Code. We split the landings according to the distribution
@@ -88,7 +89,7 @@ def main():
     numerical_ags = [
         ag for ag in stock_landings["Analysis Group"].unique() if ag not in sg_list
     ]
-    stock_landings = compute_missing_landings_v1(
+    stock_landings = compute_missing_stock_landings(
         stock_landings, fishstat, numerical_ags, nei_to_isscaap
     )
 
@@ -97,7 +98,6 @@ def main():
         "FAO Area",
         "ASFIS Scientific Name",
         "Location",
-        "Proxy Species",
         "Stock Landings 2021",
     ]
     stock_landings = stock_landings[cols_to_save]

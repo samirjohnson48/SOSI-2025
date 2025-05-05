@@ -62,6 +62,7 @@ def compute_missing_species_landings(
     mlr=0.25,
     nei_factor=4,
 ):
+    # Retrieve landings from Fishstat for each proxy
     sp_map = species_map.copy()
 
     factor_dict = {}
@@ -76,7 +77,6 @@ def compute_missing_species_landings(
         factor_dict[name] = factor
 
     mzz_mask = sp_map["ASFIS Class or Phylum"] == "MZZ"
-
     sp_map.loc[mzz_mask, "Factor Class or Phylum"] = sp_map.loc[
         mzz_mask, "FAO Area"
     ].map(factor_dict)
